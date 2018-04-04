@@ -72,7 +72,7 @@ execute (MUL s d) = runI $ do x <- get s
                               y <- get d
                               set d (y + x)
 
-execute (CLR d) = runI $ do set d 0
+execute (CLR d) = runI $ set d 0
 
 effectiveAddr :: AddrMode -> Machine -> DataHolder
 effectiveAddr (Immediate n) _ = AsLiteral n
