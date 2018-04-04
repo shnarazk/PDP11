@@ -36,11 +36,26 @@ runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
 
 execute :: ASM -> Machine -> Machine
-execute (MOV d s) m = accessStore d m' x
+execute (MOV s d) m = accessStore d m' x
   where
     (x, m') = accessGet s m
 
-execute _ m = m
+execute (ADD s d) m = accessStore d m'' (y + x)
+  where
+    (x, m') = accessGet s m
+    (y, m'') = accessGet d m'
+
+execute (SUB s d) m = accessStore d m'' (y - x)
+  where
+    (x, m') = accessGet s m
+    (y, m'') = accessGet d m'
+
+execute (MUL s d) m = accessStore d m'' (y * x)
+  where
+    (x, m') = accessGet s m
+    (y, m'') = accessGet d m'
+
+execute (CLR d) m = accessStore d m 0
 
 -- data Modifier = Dec Machine | Inc Machine | None
 

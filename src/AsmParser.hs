@@ -14,7 +14,14 @@ readASM str = case (parse readASMs "stdin" str) of
                 Right x -> return $ Just x
 
 readASMs :: Parsec String () [ASM]
-readASMs = sepBy asmMove newline
+readASMs = sepBy commands newline
+  where
+    commands = choice [ asmMOV
+                      , asmADD
+                      , asmSUB
+                      , asmMUL
+                      , asmCLR
+                      ]
 
 registerId :: Parsec String () RegId
 registerId = do
@@ -61,13 +68,33 @@ addrModeImmediate = do
   char '#'
   Immediate <$> integer
 
-asmMove :: Parsec String () ASM
-asmMove = do
-  string "MOV"
+oneAddr :: Parsec String () AddrMode
+oneAddr = do
+  x <- spaces *> addrMode
+  newline
+  return x
+
+twoAddrs :: Parsec String () (AddrMode, AddrMode)
+twoAddrs = do
   x <- spaces *> addrMode
   y <- spaces *> addrMode
   newline
-  return $ MOV x y
+  return $ (x, y)
+
+asmMOV :: Parsec String () ASM
+asmMOV = uncurry MOV <$> (string "MOV" *> twoAddrs)
+
+asmADD :: Parsec String () ASM
+asmADD = uncurry ADD <$> (string "ADD" *> twoAddrs)
+
+asmSUB :: Parsec String () ASM
+asmSUB = uncurry ADD <$> (string "SUB" *> twoAddrs)
+
+asmMUL :: Parsec String () ASM
+asmMUL = uncurry ADD <$> (string "MUL" *> twoAddrs)
+
+asmCLR :: Parsec String () ASM
+asmCLR = CLR <$> (string "CLR" *> oneAddr)
 
 integer :: Parsec String () Int
 integer = read <$> many1 digit
