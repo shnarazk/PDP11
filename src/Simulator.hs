@@ -20,7 +20,7 @@ instance Show Machine where
   show (Machine m r) = "M: " ++ show (elems m) ++ ", R: " ++ show (elems r)
 
 initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = Machine (chunk 20 [0, 10, 20, 40, 80]) (chunk 8 [0, 1, 0, 2, 0, 5])
+initialMachine = Machine (chunk 20 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
   where
     chunk :: Int -> [Int] -> Array Int Int
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
@@ -82,43 +82,51 @@ effectiveAddr (AutoDec (Reg i)) (Machine _ r)
 accessGet :: AddrMode -> Machine -> (Int, Machine)
 accessGet a@(AutoInc (Reg j)) mr@(Machine m r) =
   case effectiveAddr a mr of
-    AtMemory   i -> (m ! i, update)
+    AtMemory   i -> (m ! i * 256 + m ! (i+1), update)
     AtRegister i -> (r ! i, update)
     AsLiteral  _ -> error "strange situation"
   where
-    update = Machine m (r // [(j, r ! j + 1)])
+    update = Machine m (r // [(j, (r ! j) + 2)])
 
 accessGet a@(AutoDec (Reg j)) (Machine m' r') =
   case effectiveAddr a mr of
-    AtMemory   i -> (m ! i, mr)
+    AtMemory   i -> (m ! i * 256 + m ! (i+1), mr)
     AtRegister i -> (r ! i, mr)
     AsLiteral  _ -> error "strange situation"
   where
-    mr@(Machine m r) = Machine m' (r' //[(j, r' ! j - 1)])
+    mr@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
 
 accessGet a mr@(Machine m r) =
   case effectiveAddr a mr of
-    AtMemory   i -> (m ! i, mr)
+    AtMemory   i -> (m ! i * 256 + m ! (i+1), mr)
     AtRegister i -> (r ! i, mr)
     AsLiteral  n -> (n,     mr)
 
 accessStore :: AddrMode -> Machine -> Int -> Machine
 accessStore a@(AutoInc (Reg j)) mr@(Machine m r) x =
   case effectiveAddr a mr of
-    AtMemory   i -> Machine (m // [(i, x)]) (r // [(j, r ! j + 1)])
-    AtRegister i -> Machine m               (r // [(i, x), (j, r ! j + 1)])
+    AtMemory   i -> Machine (m // update i x) (r // [(j, (r ! j) + 2)])
+    AtRegister i -> Machine m                 (r // [(i, x), (j, (r ! j) + 2)])
     AsLiteral  _ -> error "strange situation"
+  where
+    update :: Int -> Int -> [(Int, Int)]
+    update i w = [(i, div w 256), (i + 1, mod w 256)]
 
 accessStore a@(AutoDec (Reg j)) (Machine m' r') x =
   case effectiveAddr a mr of
-    AtMemory   i -> Machine (m // [(i, x)]) r
-    AtRegister i -> Machine m               (r // [(i, x)])
+    AtMemory   i -> Machine (m // update i x) r
+    AtRegister i -> Machine m                 (r // [(i, x)])
     AsLiteral  _ -> error "strange situation"
   where
-    mr@(Machine m r) = Machine m' (r' //[(j, r' ! j - 1)])
+    mr@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
+    update :: Int -> Int -> [(Int, Int)]
+    update i w = [(i, div w 256), (i + 1, mod w 256)]
 
 accessStore a mr@(Machine m r) x =
   case effectiveAddr a mr of
-    AtMemory   i -> Machine (m // [(i, x)]) r
-    AtRegister i -> Machine m               (r // [(i, x)])
-    AsLiteral  n -> Machine (m // [(n, x)]) r
+    AtMemory   i -> Machine (m // update i x) r
+    AtRegister i -> Machine m                 (r // [(i, x)])
+    AsLiteral  n -> Machine (m // update n x) r
+  where
+    update :: Int -> Int -> [(Int, Int)]
+    update i w = [(i, div w 256), (i + 1, mod w 256)]
