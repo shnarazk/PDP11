@@ -20,7 +20,7 @@ instance Show Machine where
   show (Machine m r) = "M: " ++ show (elems m) ++ ", R: " ++ show (elems r)
 
 initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = Machine (chunk 20 [0, 10, 20]) (chunk 8 [0, 1, 0, 2])
+initialMachine = Machine (chunk 20 [0, 10, 20, 40, 80]) (chunk 8 [0, 1, 0, 2, 0, 5])
   where
     chunk :: Int -> [Int] -> Array Int Int
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
