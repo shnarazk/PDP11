@@ -77,6 +77,7 @@ oneAddr = do
 twoAddrs :: Parsec String () (AddrMode, AddrMode)
 twoAddrs = do
   x <- spaces *> addrMode
+  char ','
   y <- spaces *> addrMode
   newline
   return $ (x, y)
