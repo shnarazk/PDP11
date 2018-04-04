@@ -19,15 +19,11 @@ data Machine
 instance Show Machine where
   show (Machine m r) = "M: " ++ show (elems m) ++ ", R: " ++ show (elems r)
 
-initialMachine :: Machine
-initialMachine = Machine (newM [0, 10, 20]) (newR [0, 1, 0, 2])
+initialMachine :: Machine -- memory is at left; register is at right.
+initialMachine = Machine (chunk 20 [0, 10, 20]) (chunk 8 [0, 1, 0, 2])
   where
-    m = 20
-    r = 8
-    newM :: [Int] -> Array Int Int
-    newM l = listArray (0, m-1) (take m (l ++ repeat 0))
-    newR :: [Int] -> Array Int Int
-    newR l = listArray (1, r) (take r (l ++ repeat 0))
+    chunk :: Int -> [Int] -> Array Int Int
+    chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
 
 runSimulator :: Machine -> [ASM] -> [Machine]
 runSimulator m l = scanr execute m l
