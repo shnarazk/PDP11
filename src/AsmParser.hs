@@ -1,7 +1,6 @@
 module AsmParser
     (
       readASM
-    , readASMs
     ) where
 
 import Text.Parsec
@@ -14,7 +13,7 @@ readASM str = case (parse readASMs "stdin" str) of
                 Right x -> return $ Just x
 
 readASMs :: Parsec String () [ASM]
-readASMs = sepBy commands newline
+readASMs = many1 (commands <* newline)
   where
     commands = choice [ asmMOV
                       , asmADD
@@ -71,7 +70,6 @@ addrModeImmediate = do
 oneAddr :: Parsec String () AddrMode
 oneAddr = do
   x <- spaces *> addrMode
-  newline
   return x
 
 twoAddrs :: Parsec String () (AddrMode, AddrMode)
@@ -79,7 +77,6 @@ twoAddrs = do
   x <- spaces *> addrMode
   char ','
   y <- spaces *> addrMode
-  newline
   return $ (x, y)
 
 asmMOV :: Parsec String () ASM

@@ -26,7 +26,7 @@ initialMachine = Machine (chunk 20 [0, 10, 20]) (chunk 8 [0, 1, 0, 2])
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
 
 runSimulator :: Machine -> [ASM] -> [Machine]
-runSimulator m l = scanr execute m l
+runSimulator m l = scanl (flip execute) m l
 
 runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
@@ -55,59 +55,70 @@ execute (CLR d) m = accessStore d m 0
 
 -- data Modifier = Dec Machine | Inc Machine | None
 
-effectiveAddr :: AddrMode -> Machine -> Either Int Int
-effectiveAddr (Immediate n) _ = Left n
-effectiveAddr (Register (Reg r)) _ = Right r
+data DataHolder
+  = AtRegister Int
+  | AtMemory Int
+  | AsLiteral Int
+
+effectiveAddr :: AddrMode -> Machine -> DataHolder
+effectiveAddr (Immediate n) _ = AsLiteral n
+effectiveAddr (Register (Reg r)) _ = AtRegister r
 effectiveAddr (Indirect (Reg i)) (Machine _ r)
   | i < 0 =    error "a wrong register"
   | a < 0 =    error "a wrong address"
-  | otherwise = Left a
+  | otherwise = AtMemory a
   where a = r ! i
 effectiveAddr (AutoInc (Reg i)) (Machine _ r)
   | i < 0 =    error "a wrong register"
   | a < 0 =    error "a wrong address"
-  | otherwise = Left a
+  | otherwise = AtMemory a
   where a = r ! i
 effectiveAddr (AutoDec (Reg i)) (Machine _ r)
   | i < 0 =    error "a wrong register"
   | a < 0 =    error "a wrong address"
-  | otherwise = Left a
+  | otherwise = AtMemory a
   where a = r ! i
 
 accessGet :: AddrMode -> Machine -> (Int, Machine)
 accessGet a@(AutoInc (Reg j)) mr@(Machine m r) =
   case effectiveAddr a mr of
-    Left  i -> (m ! i, update)
-    Right i -> (r ! i, update)
+    AtMemory   i -> (m ! i, update)
+    AtRegister i -> (r ! i, update)
+    AsLiteral  _ -> error "strange situation"
   where
     update = Machine m (r // [(j, r ! j + 1)])
 
 accessGet a@(AutoDec (Reg j)) (Machine m' r') =
   case effectiveAddr a mr of
-    Left  i -> (m ! i, mr)
-    Right i -> (r ! i, mr)
+    AtMemory   i -> (m ! i, mr)
+    AtRegister i -> (r ! i, mr)
+    AsLiteral  _ -> error "strange situation"
   where
     mr@(Machine m r) = Machine m' (r' //[(j, r' ! j - 1)])
 
 accessGet a mr@(Machine m r) =
   case effectiveAddr a mr of
-    Left  i -> (m ! i, mr)
-    Right i -> (r ! i, mr)
+    AtMemory   i -> (m ! i, mr)
+    AtRegister i -> (r ! i, mr)
+    AsLiteral  n -> (n,     mr)
 
 accessStore :: AddrMode -> Machine -> Int -> Machine
 accessStore a@(AutoInc (Reg j)) mr@(Machine m r) x =
   case effectiveAddr a mr of
-    Left  i -> Machine (m // [(i, x)]) (r // [(j, r ! j + 1)])
-    Right i -> Machine m               (r // [(i, x), (j, r ! j + 1)])
+    AtMemory   i -> Machine (m // [(i, x)]) (r // [(j, r ! j + 1)])
+    AtRegister i -> Machine m               (r // [(i, x), (j, r ! j + 1)])
+    AsLiteral  _ -> error "strange situation"
 
 accessStore a@(AutoDec (Reg j)) (Machine m' r') x =
   case effectiveAddr a mr of
-    Left  i -> Machine (m // [(i, x)]) r
-    Right i -> Machine m               (r // [(i, x)])
+    AtMemory   i -> Machine (m // [(i, x)]) r
+    AtRegister i -> Machine m               (r // [(i, x)])
+    AsLiteral  _ -> error "strange situation"
   where
     mr@(Machine m r) = Machine m' (r' //[(j, r' ! j - 1)])
 
 accessStore a mr@(Machine m r) x =
   case effectiveAddr a mr of
-    Left  i -> Machine (m // [(i, x)]) r
-    Right i -> Machine m               (r // [(i, x)])
+    AtMemory   i -> Machine (m // [(i, x)]) r
+    AtRegister i -> Machine m               (r // [(i, x)])
+    AsLiteral  n -> Machine (m // [(n, x)]) r

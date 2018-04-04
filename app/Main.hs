@@ -9,7 +9,7 @@ main = do
   str <- getContents
   x <- readASM str
   case x of
-    Just programs -> do let states = reverse $ runSimulator' programs
-                        print (head states)
-                        mapM_ (\(n, m) -> do print n; print m) $ zip programs (tail states)
+    Just programs -> do let states = runSimulator' programs
+                            instrs = "# Initial state" : map show programs
+                        mapM_ (\(n, m) -> do putStrLn n; print m) $ zip instrs states
     Nothing -> return ()
