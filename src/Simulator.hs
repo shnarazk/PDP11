@@ -34,7 +34,7 @@ instance Monad State where
                                   in h m'
 
 initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = Machine (chunk 20 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
+initialMachine = Machine (chunk 16 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
   where
     chunk :: Int -> [Int] -> Array Int Int
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
@@ -49,96 +49,78 @@ runI :: State a -> Machine -> Machine
 runI (State s) m = fst $ s m
 
 execute :: ASM -> Machine -> Machine
-execute (MOV s d) = runI $ do x <- getI s
-                              setI d x
+execute (MOV s' d') = runI $ do s <- getL s'
+                                d <- getL d'
+                                x <- fetchL s
+                                storeL d x
 
-execute (ADD s d) = runI $ do x <- getI s
-                              y <- getI d
-                              setI d (y + x)
+execute (ADD s' d') = runI $ do s <- getL s'
+                                d <- getL d'
+                                x <- fetchL s
+                                y <- fetchL d
+                                storeL d (y + x)
 
-execute (SUB s d) = runI $ do x <- getI s
-                              y <- getI d
-                              setI d (y - x)
+execute (SUB s' d') = runI $ do s <- getL s'
+                                d <- getL d'
+                                x <- fetchL s
+                                y <- fetchL d
+                                storeL d (y - x)
 
-execute (MUL s d) = runI $ do x <- getI s
-                              y <- getI d
-                              setI d (y + x)
+execute (MUL s' d') = runI $ do s <- getL s'
+                                d <- getL d'
+                                x <- fetchL s
+                                y <- fetchL d
+                                storeL d (y * x)
 
-execute (CLR d) = runI $ setI d 0
+execute (CLR d') = runI $ do d <- getL d'
+                             storeL d 0
 
-effectiveAddr :: AddrMode -> Machine -> DataHolder
+effectiveAddr :: AddrMode -> Machine -> Locator
 effectiveAddr (Immediate n) _ = AsLiteral n
 effectiveAddr (Register (Reg r)) _ = AtRegister r
 effectiveAddr (Indirect (Reg i)) (Machine _ r)
-  | i < 0 =    error "a wrong register"
-  | a < 0 =    error "a wrong address"
+  | i < 0 =     error "a wrong register"
+  | a < 0 =     error "a wrong address"
   | otherwise = AtMemory a
   where a = r ! i
 effectiveAddr (AutoInc (Reg i)) (Machine _ r)
-  | i < 0 =    error "a wrong register"
-  | a < 0 =    error "a wrong address"
+  | i < 0 =     error "a wrong register"
+  | a < 0 =     error "a wrong address"
   | otherwise = AtMemory a
   where a = r ! i
 effectiveAddr (AutoDec (Reg i)) (Machine _ r)
-  | i < 0 =    error "a wrong register"
-  | a < 0 =    error "a wrong address"
+  | i < 0 =     error "a wrong register"
+  | a < 0 =     error "a wrong address"
   | otherwise = AtMemory a
   where a = r ! i
 
-getI :: AddrMode -> State Int
-getI = State . accessGet
+getL :: AddrMode -> State Locator
+getL = State . asLocator
 
-accessGet :: AddrMode -> Machine -> (Machine, Int) -- AddrMode -> State Int
-accessGet a@(AutoInc (Reg j)) mr@(Machine m r) =
+asLocator :: AddrMode -> Machine -> (Machine, Locator) -- AddrMode -> State Int
+asLocator a@(AutoInc (Reg j)) mr@(Machine m r) =
   case effectiveAddr a mr of
-    AtMemory   i -> (update, m ! i * 256 + m ! (i+1))
-    AtRegister i -> (update, r ! i)
+    AtMemory   i -> (update, AtMemory i)
+    AtRegister i -> (update, AtRegister i)
     AsLiteral  _ -> error "strange situation"
   where
     update = Machine m (r // [(j, (r ! j) + 2)])
 
-accessGet a@(AutoDec (Reg j)) (Machine m' r') =
+asLocator a@(AutoDec (Reg j)) (Machine m' r') =
   case effectiveAddr a mr of
-    AtMemory   i -> (mr, m ! i * 256 + m ! (i+1))
-    AtRegister i -> (mr, r ! i)
+    AtMemory   i -> (mr, AtMemory i)
+    AtRegister i -> (mr, AtRegister i)
     AsLiteral  _ -> error "strange situation"
   where
     mr@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
 
-accessGet a mr@(Machine m r) =
-  case effectiveAddr a mr of
-    AtMemory   i -> (mr, m ! i * 256 + m ! (i+1))
-    AtRegister i -> (mr, r ! i)
-    AsLiteral  n -> (mr, n)
+asLocator a mr = (mr, effectiveAddr a mr)
 
-setI :: AddrMode -> Int -> State ()
-setI a d = State $ accessStore a d
+fetchL :: Locator -> State Int
+fetchL (AtMemory i)   = State $ \s@(Machine m _) -> (s, (m ! i * 256 + m ! (i+1)))
+fetchL (AtRegister i) = State $ \s@(Machine _ r) -> (s, (r ! i))
+fetchL (AsLiteral x)  = State $ \s -> (s, x)
 
-accessStore :: AddrMode -> Int -> Machine -> (Machine, ())
-accessStore a@(AutoInc (Reg j)) x mr@(Machine m r) =
-  case effectiveAddr a mr of
-    AtMemory   i -> (Machine (m // update i x) (r // [(j, (r ! j) + 2)]), ())
-    AtRegister i -> (Machine m                 (r // [(i, x), (j, (r ! j) + 2)]), ())
-    AsLiteral  _ -> error "strange situation"
-  where
-    update :: Int -> Int -> [(Int, Int)]
-    update i w = [(i, div w 256), (i + 1, mod w 256)]
-
-accessStore a@(AutoDec (Reg j)) x (Machine m' r') =
-  case effectiveAddr a mr of
-    AtMemory   i -> (Machine (m // update i x) r, ())
-    AtRegister i -> (Machine m                 (r // [(i, x)]), ())
-    AsLiteral  _ -> error "strange situation"
-  where
-    mr@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
-    update :: Int -> Int -> [(Int, Int)]
-    update i w = [(i, div w 256), (i + 1, mod w 256)]
-
-accessStore a x mr@(Machine m r) =
-  case effectiveAddr a mr of
-    AtMemory   i -> (Machine (m // update i x) r, ())
-    AtRegister i -> (Machine m                 (r // [(i, x)]), ())
-    AsLiteral  n -> (Machine (m // update n x) r, ())
-  where
-    update :: Int -> Int -> [(Int, Int)]
-    update i w = [(i, div w 256), (i + 1, mod w 256)]
+storeL :: Locator -> Int -> State ()
+storeL (AtMemory i)   x = State $ \(Machine m r) -> (Machine (m // [(i, div x 256), (i + 1, mod x 256)]) r, ())
+storeL (AtRegister i) x = State $ \(Machine m r) -> (Machine m (r // [(i, x)]), ())

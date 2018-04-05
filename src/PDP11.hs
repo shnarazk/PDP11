@@ -1,7 +1,7 @@
 module PDP11
     (
       Machine(..)
-    , DataHolder(..)
+    , Locator(..)
     , RegId(..)
     , AddrMode(..)
     , ASM(..)
@@ -21,7 +21,7 @@ data Machine
   deriving (Eq, Ord, Read)
 
 pdp11 :: [ASM] -> Machine -- memory is at left; register is at right.
-pdp11 _ = Machine (chunk 20 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
+pdp11 _ = Machine (chunk 16 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
   where
     chunk :: Int -> [Int] -> Array Int Int
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
@@ -30,7 +30,7 @@ pdp11 _ = Machine (chunk 20 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4,
 instance Show Machine where
   show (Machine m r) = "M: " ++ show (elems m) ++ ", R: " ++ show (elems r)
 
-data DataHolder
+data Locator
   = AtRegister Int
   | AtMemory Int
   | AsLiteral Int
