@@ -1,28 +1,20 @@
+{-# LANGUAGE
+    TemplateHaskell
+  #-}
+
 module Simulator
     (
       Machine(..)
+    , initialMachine
     , runSimulator
     , runSimulator'
     ) where
 
+import Control.Lens
 import Data.Array
-import ASM
+import PDP11
 
-data Machine
-  = Machine
-    {
-      memory :: Array Int Int
-    , register :: Array Int Int
-    }
-  deriving (Eq, Ord, Read)
-
-instance Show Machine where
-  show (Machine m r) = "M: " ++ show (elems m) ++ ", R: " ++ show (elems r)
-
-data DataHolder
-  = AtRegister Int
-  | AtMemory Int
-  | AsLiteral Int
+makeLenses ''Machine
 
 newtype State a = State ((->) Machine (Machine, a))
 
@@ -57,22 +49,22 @@ runI :: State a -> Machine -> Machine
 runI (State s) m = fst $ s m
 
 execute :: ASM -> Machine -> Machine
-execute (MOV s d) = runI $ do x <- get s
-                              set d 0
+execute (MOV s d) = runI $ do x <- getI s
+                              setI d x
 
-execute (ADD s d) = runI $ do x <- get s
-                              y <- get d
-                              set d (y + x)
+execute (ADD s d) = runI $ do x <- getI s
+                              y <- getI d
+                              setI d (y + x)
 
-execute (SUB s d) = runI $ do x <- get s
-                              y <- get d
-                              set d (y - x)
+execute (SUB s d) = runI $ do x <- getI s
+                              y <- getI d
+                              setI d (y - x)
 
-execute (MUL s d) = runI $ do x <- get s
-                              y <- get d
-                              set d (y + x)
+execute (MUL s d) = runI $ do x <- getI s
+                              y <- getI d
+                              setI d (y + x)
 
-execute (CLR d) = runI $ set d 0
+execute (CLR d) = runI $ setI d 0
 
 effectiveAddr :: AddrMode -> Machine -> DataHolder
 effectiveAddr (Immediate n) _ = AsLiteral n
@@ -93,8 +85,8 @@ effectiveAddr (AutoDec (Reg i)) (Machine _ r)
   | otherwise = AtMemory a
   where a = r ! i
 
-get :: AddrMode -> State Int
-get = State . accessGet
+getI :: AddrMode -> State Int
+getI = State . accessGet
 
 accessGet :: AddrMode -> Machine -> (Machine, Int) -- AddrMode -> State Int
 accessGet a@(AutoInc (Reg j)) mr@(Machine m r) =
@@ -119,8 +111,8 @@ accessGet a mr@(Machine m r) =
     AtRegister i -> (mr, r ! i)
     AsLiteral  n -> (mr, n)
 
-set :: AddrMode -> Int -> State ()
-set a d = State $ accessStore a d
+setI :: AddrMode -> Int -> State ()
+setI a d = State $ accessStore a d
 
 accessStore :: AddrMode -> Int -> Machine -> (Machine, ())
 accessStore a@(AutoInc (Reg j)) x mr@(Machine m r) =

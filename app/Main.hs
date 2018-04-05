@@ -1,7 +1,7 @@
 module Main where
 
-import ASM
-import AsmParser
+import PDP11
+import Assembler
 import Simulator
 
 main :: IO ()

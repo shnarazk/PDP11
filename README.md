@@ -16,3 +16,12 @@ ADD (Immediate 4) (Register (Reg 0))
 M: [0,10,20,40,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], R: [10,1,0,2,0,5,0,0]
 $
 ```
+
+
+#### TODO
+
+1. Text.Parsec -- parse a Assembly
+1. Monad -- make an interpreter
+1. Lens -- use concise accessors
+1. Servant -- run as a web server
+1. Discord-hs -- make a bot

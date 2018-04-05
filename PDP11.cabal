@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 37e72484375ac80cfa4f90bdaaa60d5867d9ea962cd439fb12788e981677907f
+-- hash: 43eafec068db07e234c9086b7865b920245d27b5b065e3405e83b698d7abab59
 
 name:           PDP11
 version:        0.1.0.0
@@ -27,9 +27,9 @@ source-repository head
 
 library
   exposed-modules:
-      ASM
-      AsmParser
+      Assembler
       Lib
+      PDP11
       Simulator
   other-modules:
       Paths_PDP11
@@ -38,6 +38,7 @@ library
   build-depends:
       array
     , base >=4.7 && <5
+    , lens
     , parsec >=3.1
   default-language: Haskell2010
 
@@ -52,6 +53,7 @@ executable PDP11-exe
       PDP11
     , array
     , base >=4.7 && <5
+    , lens
     , parsec >=3.1
   default-language: Haskell2010
 
@@ -67,5 +69,6 @@ test-suite PDP11-test
       PDP11
     , array
     , base >=4.7 && <5
+    , lens
     , parsec >=3.1
   default-language: Haskell2010

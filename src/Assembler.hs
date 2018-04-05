@@ -1,11 +1,11 @@
-module AsmParser
+module Assembler
     (
       readASM
     ) where
 
 import Text.Parsec
 import Text.Parsec.Char
-import ASM
+import PDP11
 
 readASM :: String -> IO (Maybe [ASM])
 readASM str = case (parse readASMs "stdin" str) of
