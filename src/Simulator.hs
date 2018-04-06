@@ -34,7 +34,7 @@ instance Monad State where
                                   in h m'
 
 initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = Machine (chunk 16 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
+initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
   where
     chunk :: Int -> [Int] -> Array Int Int
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
@@ -49,78 +49,50 @@ runI :: State a -> Machine -> Machine
 runI (State s) m = fst $ s m
 
 execute :: ASM -> Machine -> Machine
-execute (MOV s' d') = runI $ do s <- getL s'
-                                d <- getL d'
-                                x <- fetchL s
-                                storeL d x
+execute (MOV s d) = runI $ do (_, x) <- fetchI s
+                              (p, _) <- fetchI d
+                              storeI p x
 
-execute (ADD s' d') = runI $ do s <- getL s'
-                                d <- getL d'
-                                x <- fetchL s
-                                y <- fetchL d
-                                storeL d (y + x)
+execute (ADD s d) = runI $ do (_, x) <- fetchI s
+                              (p, y) <- fetchI d
+                              storeI p (y + x)
 
-execute (SUB s' d') = runI $ do s <- getL s'
-                                d <- getL d'
-                                x <- fetchL s
-                                y <- fetchL d
-                                storeL d (y - x)
+execute (SUB s d) = runI $ do (_, x) <- fetchI s
+                              (p, y) <- fetchI d
+                              storeI p (y - x)
 
-execute (MUL s' d') = runI $ do s <- getL s'
-                                d <- getL d'
-                                x <- fetchL s
-                                y <- fetchL d
-                                storeL d (y * x)
+execute (MUL s d) = runI $ do (_, x) <- fetchI s
+                              (p, y) <- fetchI d
+                              storeI p (y * x)
 
-execute (CLR d') = runI $ do d <- getL d'
-                             storeL d 0
+execute (CLR d) = runI $ do (p, _) <- fetchI d
+                            storeI p 0
 
-effectiveAddr :: AddrMode -> Machine -> Locator
-effectiveAddr (Immediate n) _ = AsLiteral n
-effectiveAddr (Register (Reg r)) _ = AtRegister r
-effectiveAddr (AutoInc (Reg i)) (Machine _ r)
-  | i < 0 =     error "a wrong register"
-  | a < 0 =     error "a wrong address"
-  | otherwise = AtMemory a
-  where a = r ! i
-effectiveAddr (AutoDec (Reg i)) (Machine _ r)
-  | i < 0 =     error "a wrong register"
-  | a < 0 =     error "a wrong address"
-  | otherwise = AtMemory a
-  where a = r ! i
+-- successive memory access
+(!..) :: Array Int Int -> Int -> Int
+v !.. i = (v ! i) * 256 + (v ! (i + 1))
 
-getL :: AddrMode -> State Locator
-getL = State . asLocator
+-- byte array index for an int
+(<..) :: Int -> Int -> [(Int, Int)]
+i <.. x = [(i, div x 256), (i + 1, mod x 256)]
 
-asLocator :: AddrMode -> Machine -> (Machine, Locator) -- AddrMode -> State Int
-asLocator a@(AutoInc (Reg j)) mr@(Machine m r) = (update, AtRegister j)
-  where
-    update = Machine m (r // [(j, (r ! j) + 2)])
+-- returns a pair of left-hand value and right-hand value
+fetchI :: AddrMode -> State (Locator, Int)
+fetchI = State . fetchLR
 
-asLocator a@(AutoDec (Reg j)) (Machine m' r') = (mr, AtRegister j)
-  where
-    mr = Machine m' (r' //[(j, (r' ! j) - 2)])
+fetchLR :: AddrMode -> Machine -> (Machine, (Locator, Int))
+fetchLR (Immediate n) s = (s, (AsLiteral n, n))
+fetchLR (Register (Reg i)) s@(Machine _ r) = (s, (AtRegister i, r ! i))
+fetchLR (AutoInc (Reg j)) (Machine m r) = (s', (AtMemory i, m !.. i))
+  where i = r ! j
+        s' = Machine m (r // [(j, i + 2)])
+fetchLR (AutoDec (Reg j)) (Machine m' r') = (s, (AtMemory i, m !.. i))
+  where i = r ! j
+        s@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
+fetchLR (Indirect a) s = (s', (AtMemory v, m !.. v))
+  where (s'@(Machine m _), (_, v)) = fetchLR a s
 
-asLocator (Indirect (AutoInc (Reg j))) (Machine m r) = (s', AtMemory (r ! j))
-  where
-    s' = Machine m (r // [(j, (r ! j) + 2)])
-
-asLocator (Indirect a) s =
-  case l of
-    AtMemory   i -> (s', AtMemory ((m ! i) * 256 + (m ! (i + 1))))
-    AtRegister i -> (s', AtMemory (r ! i))
-    AsLiteral  i -> (s', AtMemory i)
-  where
-    (s'@(Machine m r), l) = asLocator a s
-
-asLocator a mr = (mr, effectiveAddr a mr)
-
-fetchL :: Locator -> State Int
-fetchL (AtMemory i)   = State $ \s@(Machine m _) -> (s, (m ! i * 256 + m ! (i+1)))
-fetchL (AtRegister i) = State $ \s@(Machine _ r) -> (s, (r ! i))
-fetchL (AsLiteral x)  = State $ \s -> (s, x)
-
-storeL :: Locator -> Int -> State ()
-storeL (AtMemory i)   x = State $ \(Machine m r) -> (Machine (m // [(i, div x 256), (i + 1, mod x 256)]) r, ())
-storeL (AtRegister i) x = State $ \(Machine m r) -> (Machine m (r // [(i, x)]), ())
-storeL (AsLiteral i)  x = State $ \(Machine m r) -> (Machine (m // [(i, div x 256), (i + 1, mod x 256)]) r, ())
+storeI :: Locator -> Int -> State ()
+storeI (AtMemory i)   x = State $ \(Machine m r) -> (Machine (m // (i <.. x)) r, ())
+storeI (AtRegister i) x = State $ \(Machine m r) -> (Machine m (r // [(i, x)]), ())
+storeI (AsLiteral i)  x = State $ \(Machine m r) -> (Machine (m // (i <.. x)) r, ())
