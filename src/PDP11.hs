@@ -40,7 +40,7 @@ data RegId = Reg Int
 
 data AddrMode
   = Register RegId
-  | Indirect RegId
+  | Indirect AddrMode
   | Indexed Int RegId
 --  | PCrelat Int
   | AutoInc RegId

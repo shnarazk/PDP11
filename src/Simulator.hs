@@ -78,11 +78,6 @@ execute (CLR d') = runI $ do d <- getL d'
 effectiveAddr :: AddrMode -> Machine -> Locator
 effectiveAddr (Immediate n) _ = AsLiteral n
 effectiveAddr (Register (Reg r)) _ = AtRegister r
-effectiveAddr (Indirect (Reg i)) (Machine _ r)
-  | i < 0 =     error "a wrong register"
-  | a < 0 =     error "a wrong address"
-  | otherwise = AtMemory a
-  where a = r ! i
 effectiveAddr (AutoInc (Reg i)) (Machine _ r)
   | i < 0 =     error "a wrong register"
   | a < 0 =     error "a wrong address"
@@ -98,21 +93,25 @@ getL :: AddrMode -> State Locator
 getL = State . asLocator
 
 asLocator :: AddrMode -> Machine -> (Machine, Locator) -- AddrMode -> State Int
-asLocator a@(AutoInc (Reg j)) mr@(Machine m r) =
-  case effectiveAddr a mr of
-    AtMemory   i -> (update, AtMemory i)
-    AtRegister i -> (update, AtRegister i)
-    AsLiteral  _ -> error "strange situation"
+asLocator a@(AutoInc (Reg j)) mr@(Machine m r) = (update, AtRegister j)
   where
     update = Machine m (r // [(j, (r ! j) + 2)])
 
-asLocator a@(AutoDec (Reg j)) (Machine m' r') =
-  case effectiveAddr a mr of
-    AtMemory   i -> (mr, AtMemory i)
-    AtRegister i -> (mr, AtRegister i)
-    AsLiteral  _ -> error "strange situation"
+asLocator a@(AutoDec (Reg j)) (Machine m' r') = (mr, AtRegister j)
   where
-    mr@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
+    mr = Machine m' (r' //[(j, (r' ! j) - 2)])
+
+asLocator (Indirect (AutoInc (Reg j))) (Machine m r) = (s', AtMemory (r ! j))
+  where
+    s' = Machine m (r // [(j, (r ! j) + 2)])
+
+asLocator (Indirect a) s =
+  case l of
+    AtMemory   i -> (s', AtMemory ((m ! i) * 256 + (m ! (i + 1))))
+    AtRegister i -> (s', AtMemory (r ! i))
+    AsLiteral  i -> (s', AtMemory i)
+  where
+    (s'@(Machine m r), l) = asLocator a s
 
 asLocator a mr = (mr, effectiveAddr a mr)
 

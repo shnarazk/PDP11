@@ -42,7 +42,7 @@ addrModeRegister = Register <$> registerId
 addrModeIndirect :: Parsec String () AddrMode
 addrModeIndirect = do
   char '@'
-  Indirect <$> registerId
+  Indirect <$> addrMode
 
 addrModeIndexed :: Parsec String () AddrMode
 addrModeIndexed = do
