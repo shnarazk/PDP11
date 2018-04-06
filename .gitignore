@@ -1,3 +1,4 @@
+discord/DiscordSecret.hs
 dist
 dist-*
 cabal-dev
