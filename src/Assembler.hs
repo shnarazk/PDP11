@@ -7,10 +7,10 @@ import Text.Parsec
 import Text.Parsec.Char
 import PDP11
 
-readASM :: String -> IO (Maybe [ASM])
+readASM :: String -> Maybe [ASM]
 readASM str = case (parse readASMs "stdin" str) of
-                Left err -> do print err; return Nothing
-                Right x -> return $ Just x
+                Left err -> Nothing
+                Right x  -> Just x
 
 readASMs :: Parsec String () [ASM]
 readASMs = many1 (commands <* newline)
