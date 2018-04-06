@@ -20,8 +20,9 @@ $
 
 #### TODO
 
-1. Text.Parsec -- parse a Assembly
-1. Monad -- make an interpreter
-1. Lens -- use concise accessors
-1. Servant -- run as a web server
-1. Discord-hs -- make a bot
+- [x] Text.Parsec -- parse a Assembly
+- [ ] Monad -- make an interpreter
+- [ ] MTL -- don't invent something old again
+- [ ] Lens -- use concise accessors
+- [ ] Servant -- run as a web server
+- [x] Discord-hs -- make a bot
