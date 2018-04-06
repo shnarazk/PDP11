@@ -89,8 +89,12 @@ fetchLR (AutoInc (Reg j)) (Machine m r) = (s', (AtMemory i, m !.. i))
 fetchLR (AutoDec (Reg j)) (Machine m' r') = (s, (AtMemory i, m !.. i))
   where i = r ! j
         s@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
-fetchLR (Indirect a) s = (s', (AtMemory v, m !.. v))
-  where (s'@(Machine m _), (_, v)) = fetchLR a s
+fetchLR (Indirect a) s =
+  case l of
+    AtRegister _ -> (s', (AtMemory v, m !.. v))
+    AtMemory _   -> (s', (AtMemory v, m !.. v))
+    AsLiteral i  -> (s', (AtMemory (m !.. i), m !.. (m !.. i)))
+  where (s'@(Machine m _), (l, v)) = fetchLR a s
 
 storeI :: Locator -> Int -> State ()
 storeI (AtMemory i)   x = State $ \(Machine m r) -> (Machine (m // (i <.. x)) r, ())
