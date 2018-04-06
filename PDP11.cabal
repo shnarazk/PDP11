@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 43eafec068db07e234c9086b7865b920245d27b5b065e3405e83b698d7abab59
+-- hash: 522244a05917c5b1d4b780aca987e067dcab4211a7ded9d6031b7c280d1287ad
 
 name:           PDP11
 version:        0.1.0.0
@@ -28,7 +28,6 @@ source-repository head
 library
   exposed-modules:
       Assembler
-      Lib
       PDP11
       Simulator
   other-modules:
