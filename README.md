@@ -21,7 +21,7 @@ $
 #### TODO
 
 - [x] Text.Parsec -- parse a Assembly
-- [ ] Monad -- make an interpreter
+- [x] Monad -- make an interpreter
 - [ ] MTL -- don't invent something old again
 - [ ] Lens -- use concise accessors
 - [ ] Servant -- run as a web server
