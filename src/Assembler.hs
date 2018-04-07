@@ -9,7 +9,7 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.1.0"
+version = "0.2.0"
 
 readASM :: String -> Maybe [ASM]
 readASM str = case (parse readASMs "stdin" str) of
@@ -17,7 +17,7 @@ readASM str = case (parse readASMs "stdin" str) of
                 Right x  -> Just x
 
 readASMs :: Parsec String () [ASM]
-readASMs = many1 (commands <* newline)
+readASMs = many1 (spaces *> commands <* newline)
   where
     commands = choice [ asmMOV
                       , asmADD
