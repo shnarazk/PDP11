@@ -1,4 +1,4 @@
-MOV #0, R1
-CLR @(R1)+
-CLR @(R1)+
-CLR @(R1)+
+	MOV #0, R1
+	CLR @(R1)+
+	CLR @(R1)+
+	CLR @(R1)+
