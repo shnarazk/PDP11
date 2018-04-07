@@ -39,13 +39,13 @@ data RegId = Reg Int
   deriving (Eq, Ord, Read, Show)  
 
 data AddrMode
-  = Register RegId
-  | Indirect AddrMode
-  | Indexed Int RegId
+  = Register RegId              -- Register
+  | Immediate Int               -- Immediate
+  | Index Int RegId             -- Index
+  | AutoInc RegId               -- Autoincrement
+  | AutoDec RegId               -- Autodecrement
+  | Indirect AddrMode           -- ... Deffered
 --  | PCrelat Int
-  | AutoInc RegId
-  | AutoDec RegId
-  | Immediate Int
   deriving (Eq, Ord, Read, Show)  
 
 data ASM

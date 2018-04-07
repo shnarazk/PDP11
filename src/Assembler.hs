@@ -29,11 +29,11 @@ registerId = do
 
 addrMode :: Parsec String () AddrMode
 addrMode = choice [ addrModeRegister
-                  , addrModeIndirect
-                  , addrModeIndexed
+                  , addrModeImmediate
+                  , addrModeIndex
                   , addrModeAutoInc
                   , addrModeAutoDec
-                  , addrModeImmediate
+                  , addrModeIndirect
                   ]
 
 addrModeRegister :: Parsec String () AddrMode
@@ -44,11 +44,11 @@ addrModeIndirect = do
   char '@'
   Indirect <$> addrMode
 
-addrModeIndexed :: Parsec String () AddrMode
-addrModeIndexed = do
+addrModeIndex :: Parsec String () AddrMode
+addrModeIndex = do
   x <- integer <* char '('
   r <- registerId <* char ')'
-  return $ Indexed x r
+  return $ Index x r
 
 addrModeAutoInc :: Parsec String () AddrMode
 addrModeAutoInc = do

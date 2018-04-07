@@ -91,8 +91,9 @@ fetchI :: AddrMode -> State (Locator, Int)
 fetchI = State . fetchLR
 
 fetchLR :: AddrMode -> Machine -> (Machine, (Locator, Int))
-fetchLR (Immediate n) s = (s, (AsLiteral n, n))
 fetchLR (Register (Reg i)) s@(Machine _ r) = (s, (AtRegister i, r ! i))
+fetchLR (Immediate n) s = (s, (AsLiteral n, n))
+fetchLR (Index o (Reg i)) s@(Machine m _) = (s, (AtMemory (i + o), m !.. (i + o)))
 fetchLR (AutoInc (Reg j)) (Machine m r) = (s', (AtMemory i, m !.. i))
   where i = r ! j
         s' = Machine m (r // [(j, i + 2)])
