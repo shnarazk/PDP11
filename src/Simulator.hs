@@ -12,14 +12,19 @@ module Simulator
     , runSimulator'
     ) where
 
-import Control.Lens
+import Control.Lens hiding ((<.))
 import Data.Array
 import PDP11 hiding (version)
 import Assembler hiding (version)
 
 version :: String
-version = "0.2.0"
+version = "0.2.1"
 
+-- * m ^. register ^? iix 2       	    to access R2 maybe
+-- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
+-- * m & register . iix 2 .~ 300 	    to update R2 in m to 300
+-- * m & register %~ (// [(1,10), (2,20)])  to update R1 and R2 in m
+-- Note: (register %~ (// ...)) :: Machine -> Machine
 makeLenses ''Machine
 
 newtype State a = State ((->) Machine (Machine, a))
@@ -86,32 +91,37 @@ execute (CLR d) = runI $ do (p, _) <- fetchI d
 (!..) :: Array Int Int -> Int -> Int
 v !.. i = (v ! i) * 256 + (v ! (i + 1))
 
--- byte array index for an int
-(<..) :: Int -> Int -> [(Int, Int)]
-i <.. x = [(i, div x 256), (i + 1, mod x 256)]
+-- updater of byte array index for an Int
+(<..) :: Int -> Int -> (Array Int Int -> Array Int Int)
+i <.. x = (// [(i, div x 256), (i + 1, mod x 256)])
+
+-- updater of Int array index for an Int
+(<.) :: Int -> Int -> (Array Int Int -> Array Int Int)
+i <. x = (// [(i, x)])
 
 -- returns a pair of left-hand value and right-hand value
 fetchI :: AddrMode -> State (Locator, Int)
 fetchI = State . fetchLR
 
 fetchLR :: AddrMode -> Machine -> (Machine, (Locator, Int))
-fetchLR (Register (Reg i)) s@(Machine _ r) = (s, (AtRegister i, r ! i))
-fetchLR (Immediate n) s = (s, (AsLiteral n, n))
-fetchLR (Index o (Reg i)) s@(Machine m _) = (s, (AtMemory (i + o), m !.. (i + o)))
-fetchLR (AutoInc (Reg j)) (Machine m r) = (s', (AtMemory i, m !.. i))
-  where i = r ! j
-        s' = Machine m (r // [(j, i + 2)])
-fetchLR (AutoDec (Reg j)) (Machine m' r') = (s, (AtMemory i, m' !.. i))
-  where i = (r' ! j) - 2
-        s@(Machine _ r) = Machine m' (r' // [(j, i)])
-fetchLR (Indirect a) s =
+fetchLR (Register (Reg i)) s = (s, (AtRegister i, (s ^. register) ! i))
+fetchLR (Immediate n) s      = (s, (AsLiteral n, n))
+fetchLR (Index o (Reg i)) s  = (s, (AtMemory (i + o), (s ^. memory) !.. (i + o)))
+fetchLR (AutoInc (Reg j)) s  = (s', (AtMemory i, (s ^. memory) !.. i))
+  where i = (s ^. register) ! j
+        s' = s & register %~ (j <. (i + 2))
+fetchLR (AutoDec (Reg j)) s  = (s', (AtMemory i, (s ^. memory) !.. i))
+  where i = ((s ^. register) ! j) - 2
+        s' = s & register %~ (j <. i)
+fetchLR (Indirect a) s       =
   case l of
     AtRegister _ -> (s', (AtMemory v, m !.. v))
     AtMemory _   -> (s', (AtMemory v, m !.. v))
     AsLiteral i  -> (s', (AtMemory (m !.. i), m !.. (m !.. i)))
-  where (s'@(Machine m _), (l, v)) = fetchLR a s
+  where (s', (l, v)) = fetchLR a s
+        m = s' ^. memory
 
 storeI :: Locator -> Int -> State ()
-storeI (AtMemory i)   x = State $ \(Machine m r) -> (Machine (m // (i <.. x)) r, ())
-storeI (AtRegister i) x = State $ \(Machine m r) -> (Machine m (r // [(i, x)]), ())
-storeI (AsLiteral i)  x = State $ \(Machine m r) -> (Machine (m // (i <.. x)) r, ())
+storeI (AtMemory i)   x = State $ \m -> (m & memory   %~ (i <.. x), ())
+storeI (AtRegister i) x = State $ \m -> (m & register %~ (i <.  x), ())
+storeI (AsLiteral i)  x = State $ \m -> (m & memory   %~ (i <.. x), ())
