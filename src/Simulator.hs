@@ -18,7 +18,7 @@ import PDP11 hiding (version)
 import Assembler hiding (version)
 
 version :: String
-version = "0.1.0"
+version = "0.2.0"
 
 makeLenses ''Machine
 
@@ -40,7 +40,7 @@ instance Monad State where
                                   in h m'
 
 initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255]) (chunk 8 [0, 2, 0, 4, 0, 6])
+initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]) (chunk 8 [0, 2, 0, 4, 0, 6])
   where
     chunk :: Int -> [Int] -> Array Int Int
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
@@ -57,7 +57,7 @@ runPDP11 str = run <$> readASM str
           where states = runSimulator' program
                 instrs = "#0 Initial state" : zipWith3 combine [1.. ] mnems program
                 combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b
-        mnems = lines str
+        mnems = map (dropWhile (`elem` " \t")) $ lines str
 
 runI :: State a -> Machine -> Machine
 runI (State s) m = fst $ s m
@@ -101,9 +101,9 @@ fetchLR (Index o (Reg i)) s@(Machine m _) = (s, (AtMemory (i + o), m !.. (i + o)
 fetchLR (AutoInc (Reg j)) (Machine m r) = (s', (AtMemory i, m !.. i))
   where i = r ! j
         s' = Machine m (r // [(j, i + 2)])
-fetchLR (AutoDec (Reg j)) (Machine m' r') = (s, (AtMemory i, m !.. i))
-  where i = r ! j
-        s@(Machine m r) = Machine m' (r' //[(j, (r' ! j) - 2)])
+fetchLR (AutoDec (Reg j)) (Machine m' r') = (s, (AtMemory i, m' !.. i))
+  where i = (r' ! j) - 2
+        s@(Machine _ r) = Machine m' (r' // [(j, i)])
 fetchLR (Indirect a) s =
   case l of
     AtRegister _ -> (s', (AtMemory v, m !.. v))
