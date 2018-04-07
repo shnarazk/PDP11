@@ -10,6 +10,9 @@ import Assembler
 import Simulator
 import DiscordSecret (channel, uid, token)
 
+version :: String
+version = "0.1.0"
+
 send :: T.Text -> Effect DiscordM ()
 send mes = fetch' (CreateMessage channel mes Nothing)
 
@@ -33,7 +36,7 @@ mainLoop :: IO ()
 mainLoop = runBot (Bot token) $ do
   with ReadyEvent $ \(Init v u _ _ _) -> do
     liftIO . putStrLn $ "Connected to gateway v" ++ show v ++ " as " ++ show u
-    send "Hello, World! I'm back."
+    send . T.pack $ "Hello, World! I'm back (version " ++ version ++ ")."
     return ()
 
   with MessageCreateEvent $ \msg@Message{..} -> do
@@ -46,5 +49,36 @@ mainLoop = runBot (Bot token) $ do
                Nothing     -> reply msg . T.pack $ userName messageAuthor ++ ", your code is wrong."
              return ()
          | "/help" `T.isPrefixOf` messageContent -> do
-             reply msg $ T.pack "Usage\n - start with three backquotes followed by 'PDP'.\n - end with three backquotes.\n"
+             reply msg . T.pack $ helpFormat ++ helpAddrMode
          | otherwise -> return ()
+
+helpFormat = "\n\
+\Format\n\n\
+\ - start with three backquotes followed by 'PDP'.\n\
+\ - end with three backquotes.\n"
+
+helpAddrMode = "\n\
+\```\n\
+\Syntax  Addressing Mode               Action\n\
+\Rn      Register                      Data = Rn\n\
+\(Rn)+   Autoincrement                 Data = (Rn)\n\
+\                                      Rn++\n\
+\-(Rn)   Autodecrement                 Rn–\n\
+\                                      Data = (Rn)\n\
+\X(Rn)   Index                         Offset address X = (PC)\n\
+\                                      PC += 2\n\
+\                                      Base address = Rn\n\
+\                                      Data = (Rn + X)\n\
+\@Rn     Register Deferred             Data = (Rn)\n\
+\@(Rn)+  Autoincrement Deferred        Data =((Rn))\n\
+\                                      Rn++\n\
+\@-(Rn)  Autodecrement Deferred        Rn–\n\
+\                                      Data =((Rn))\n\
+\@X(Rn)  Index Deferred                Offset address X = (PC)\n\
+\                                      PC += 2\n\
+\                                      Base address = Rn\n\
+\                                      Data = ((Rn + X))\n\
+\#n      Immediate                     Data = (PC) = n\n\
+\@#A     Immediate Deferred (Absolute) Data = ((PC)) = (A)\n\
+\```\n\
+\See: https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/ \n"
