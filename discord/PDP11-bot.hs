@@ -48,11 +48,3 @@ mainLoop = runBot (Bot token) $ do
          | "/help" `T.isPrefixOf` messageContent -> do
              reply msg $ T.pack "Usage\n - start with three backquotes followed by 'PDP'.\n - end with three backquotes.\n"
          | otherwise -> return ()
-
-runPDP11 :: String -> Maybe String
-runPDP11 str = run <$> readASM str
-  where run program = unlines $ concatMap (\(n, m) -> [n, show m]) $ zip instrs states
-          where states = runSimulator' program
-                instrs = "#0 Initial state" : zipWith3 combine [1.. ] mnems program
-                combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b
-        mnems = lines str

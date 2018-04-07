@@ -5,6 +5,7 @@
 module Simulator
     (
       Machine(..)
+    , runPDP11
     , initialMachine
     , runSimulator
     , runSimulator'
@@ -13,6 +14,7 @@ module Simulator
 import Control.Lens
 import Data.Array
 import PDP11
+import Assembler
 
 makeLenses ''Machine
 
@@ -44,6 +46,14 @@ runSimulator m l = scanl (flip execute) m l
 
 runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
+
+runPDP11 :: String -> Maybe String
+runPDP11 str = run <$> readASM str
+  where run program = unlines $ concatMap (\(n, m) -> [n, show m]) $ zip instrs states
+          where states = runSimulator' program
+                instrs = "#0 Initial state" : zipWith3 combine [1.. ] mnems program
+                combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b
+        mnems = lines str
 
 runI :: State a -> Machine -> Machine
 runI (State s) m = fst $ s m
