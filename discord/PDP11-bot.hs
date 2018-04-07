@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase, MultiWayIf, OverloadedStrings, RecordWildCards #-}
 import Control.Concurrent
 import qualified Control.Exception as E
+import Data.List
 import qualified Data.Text as T
 import Pipes
 import System.Process
@@ -8,10 +9,13 @@ import Network.Discord
 import PDP11
 import Assembler
 import Simulator
+import qualified PDP11 as Spec (version)
+import qualified Assembler as Asm (version)
+import qualified Simulator as Sim (version)
 import DiscordSecret (channel, uid, token)
 
-version :: String
-version = "0.1.0"
+botVersion :: String
+botVersion = "0.1.1"
 
 send :: T.Text -> Effect DiscordM ()
 send mes = fetch' (CreateMessage channel mes Nothing)
@@ -26,7 +30,7 @@ main = do
   void $ takeMVar tic
   threadDelay $ 1000*1000*100
   main
---  
+--
 --  E.handle (\case
 --               E.UserInterrupt -> putStrLn "User interrupt recieved."
 --               e -> print e >> main) $ do
@@ -36,7 +40,7 @@ mainLoop :: IO ()
 mainLoop = runBot (Bot token) $ do
   with ReadyEvent $ \(Init v u _ _ _) -> do
     liftIO . putStrLn $ "Connected to gateway v" ++ show v ++ " as " ++ show u
-    send . T.pack $ "Hello, World! I'm back (version " ++ version ++ ")."
+    send . T.pack $ "Hello, World! I'm back (version " ++ botVersion ++ ")."
     return ()
 
   with MessageCreateEvent $ \msg@Message{..} -> do
@@ -45,12 +49,18 @@ mainLoop = runBot (Bot token) $ do
              -- liftIO $ print messageAuthor
              let code = unlines . takeWhile ("```" /=) . tail . lines $ (T.unpack messageContent)
              case runPDP11 code of
-               Just output -> reply msg . T.pack $ userName messageAuthor ++ ", I did.\n```" ++ output ++ "```"
+               Just output -> reply msg . T.pack $ userName messageAuthor ++ ", I did. -- " ++ machine_version ++ "\n```" ++ output ++ "```"
                Nothing     -> reply msg . T.pack $ userName messageAuthor ++ ", your code is wrong."
              return ()
          | "/help" `T.isPrefixOf` messageContent -> do
              reply msg . T.pack $ helpFormat ++ helpAddrMode
          | otherwise -> return ()
+
+machine_version :: String
+machine_version = intercalate ", " [ "specification: " ++ Spec.version
+                                   , "assembler: " ++ Asm.version
+                                   , "simulator: " ++ Sim.version
+                                   ]
 
 helpFormat = "\n\
 \Format\n\n\

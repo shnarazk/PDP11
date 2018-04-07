@@ -1,11 +1,15 @@
 module Assembler
     (
-      readASM
+      version
+    , readASM
     ) where
 
 import Text.Parsec
 import Text.Parsec.Char
-import PDP11
+import PDP11 hiding (version)
+
+version :: String
+version = "0.1.0"
 
 readASM :: String -> Maybe [ASM]
 readASM str = case (parse readASMs "stdin" str) of

@@ -4,7 +4,8 @@
 
 module Simulator
     (
-      Machine(..)
+      version
+    , Machine(..)
     , runPDP11
     , initialMachine
     , runSimulator
@@ -13,8 +14,11 @@ module Simulator
 
 import Control.Lens
 import Data.Array
-import PDP11
-import Assembler
+import PDP11 hiding (version)
+import Assembler hiding (version)
+
+version :: String
+version = "0.1.0"
 
 makeLenses ''Machine
 

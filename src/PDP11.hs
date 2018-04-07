@@ -1,6 +1,7 @@
 module PDP11
     (
-      Machine(..)
+      version
+    , Machine(..)
     , Locator(..)
     , RegId(..)
     , AddrMode(..)
@@ -9,6 +10,9 @@ module PDP11
     ) where
 
 import Data.Array
+
+version :: String
+version = "0.1.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
