@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 522244a05917c5b1d4b780aca987e067dcab4211a7ded9d6031b7c280d1287ad
+-- hash: bcee5f645e417bb67ee6d66ea31358bd86a073fe2f952ac76e21427859009af0
 
 name:           PDP11
 version:        0.1.0.0
@@ -39,6 +39,24 @@ library
     , base >=4.7 && <5
     , lens
     , parsec >=3.1
+  default-language: Haskell2010
+
+executable PDP11-bot
+  main-is: PDP11-bot.hs
+  other-modules:
+      DiscordSecret
+      Paths_PDP11
+  hs-source-dirs:
+      discord
+  build-depends:
+      PDP11
+    , array
+    , base ==4.*
+    , discord-hs
+    , lens
+    , parsec >=3.1
+    , req
+    , text ==1.2.*
   default-language: Haskell2010
 
 executable PDP11-exe

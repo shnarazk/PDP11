@@ -33,11 +33,24 @@ executables:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
-    - PDP11
+      - PDP11
+  PDP11-bot:
+    source-dirs:         discord
+    main:                PDP11-bot.hs
+    dependencies:
+      - PDP11
+      - base==4.*
+      - discord-hs
+      - text==1.2.*
+      - array
+      - lens
+      - parsec >=3.1
+      - req
+
 tests:
   PDP11-test:
     main:                Spec.hs

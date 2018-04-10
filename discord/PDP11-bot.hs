@@ -1,60 +1,67 @@
-{-# LANGUAGE LambdaCase, MultiWayIf, OverloadedStrings, RecordWildCards #-}
-import Control.Concurrent
-import qualified Control.Exception as E
-import Data.List
-import qualified Data.Text as T
-import Pipes
-import System.Process
+{-# LANGUAGE OverloadedStrings, TypeOperators, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+import Control.Monad (mzero)
+import Data.Proxy
+import GHC.TypeLits
+
 import Network.Discord
+import Network.HTTP.Req (MonadHttp)
+import Control.Monad.IO.Class
+
+import qualified Data.Text as T
+import Control.Monad
+import Data.List (intercalate)
 import PDP11
 import Assembler
 import Simulator
 import qualified PDP11 as Spec (version)
 import qualified Assembler as Asm (version)
 import qualified Simulator as Sim (version)
-import DiscordSecret (channel, uid, token)
+import DiscordSecret (token)
 
 botVersion :: String
-botVersion = "0.1.1"
+botVersion = "0.2.0"
 
-send :: T.Text -> Effect DiscordM ()
-send mes = fetch' (CreateMessage channel mes Nothing)
+instance DiscordAuth IO where
+  auth    = return $ Bot token
+  version = return botVersion
+  runIO   = id
 
-reply :: Message -> T.Text -> Effect DiscordM ()
-reply Message{messageChannel=chan} cont = fetch' $ CreateMessage chan cont Nothing
+instance MonadHttp (DiscordApp IO)
+
+data Handler
+
+instance EventMap Handler (DiscordApp IO) where
+  type Domain   Handler = Message
+  type Codomain Handler = ()
+
+  mapEvent p (m@Message{ messageContent = c
+                       , messageChannel = ch
+                       , messageAuthor = User{userIsBot = bot, userName = user}}
+             )
+    | bot = return ()
+    | "```PDP" `T.isPrefixOf` c = do
+        let code = unlines . takeWhile ("```" /=) . tail . lines . T.unpack $ c
+            rmes = case runPDP11 code of
+                     Just output -> "@" ++ user
+                                    ++ ", I did. -- "
+                                    ++ machine_version ++ "\n```"
+                                    ++ output
+                                    ++ "```"
+                     Nothing     -> user ++ ", your code is wrong."
+        void $ doFetch $ CreateMessage ch (T.pack rmes) Nothing
+    | "!help" `T.isPrefixOf` c = do
+        void $ doFetch $ CreateMessage ch (T.pack (helpFormat ++ helpAddrMode)) Nothing
+    | otherwise = return ()
+
+type PDP11App = (MessageCreateEvent :<>: MessageUpdateEvent) :> Handler
+
+instance EventHandler PDP11App IO
 
 main :: IO ()
-main = do
-  tic <- newEmptyMVar
-  tid <- forkFinally mainLoop (\_ -> putMVar tic ())
-  void $ takeMVar tic
-  threadDelay $ 1000*1000*100
-  main
---
---  E.handle (\case
---               E.UserInterrupt -> putStrLn "User interrupt recieved."
---               e -> print e >> main) $ do
---    mainLoop
-
-mainLoop :: IO ()
-mainLoop = runBot (Bot token) $ do
-  with ReadyEvent $ \(Init v u _ _ _) -> do
-    liftIO . putStrLn $ "Connected to gateway v" ++ show v ++ " as " ++ show u
-    send . T.pack $ "Hello, World! I'm back (version " ++ botVersion ++ ")."
-    return ()
-
-  with MessageCreateEvent $ \msg@Message{..} -> do
-    when (uid /= userId messageAuthor) $ do -- prevent infinite self loop
-      if | "```PDP" `T.isPrefixOf` messageContent -> do
-             -- liftIO $ print messageAuthor
-             let code = unlines . takeWhile ("```" /=) . tail . lines $ (T.unpack messageContent)
-             case runPDP11 code of
-               Just output -> reply msg . T.pack $ userName messageAuthor ++ ", I did. -- " ++ machine_version ++ "\n```" ++ output ++ "```"
-               Nothing     -> reply msg . T.pack $ userName messageAuthor ++ ", your code is wrong."
-             return ()
-         | "/help" `T.isPrefixOf` messageContent -> do
-             reply msg . T.pack $ helpFormat ++ helpAddrMode
-         | otherwise -> return ()
+main = runBot (Proxy :: Proxy (IO PDP11App))
 
 machine_version :: String
 machine_version = intercalate ", " [ "specification: " ++ Spec.version
@@ -65,7 +72,9 @@ machine_version = intercalate ", " [ "specification: " ++ Spec.version
 helpFormat = "\n\
 \Format\n\n\
 \ - start with three backquotes followed by 'PDP'.\n\
-\ - end with three backquotes.\n"
+\ - end with three backquotes.\n\
+\ - 3つのバッククォート文字、それから'PDP'ではじまるよ\n\
+\ - 3つのバッククォート文字でおわるよ\n"
 
 helpAddrMode = "\n\
 \```\n\
