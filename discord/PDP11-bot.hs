@@ -39,18 +39,18 @@ instance EventMap Handler (DiscordApp IO) where
 
   mapEvent p (m@Message{ messageContent = c
                        , messageChannel = ch
-                       , messageAuthor = User{userIsBot = bot, userName = user}}
+                       , messageAuthor = User{userIsBot = bot, userId = uid}}
              )
     | bot = return ()
     | "```PDP" `T.isPrefixOf` c = do
         let code = unlines . takeWhile ("```" /=) . tail . lines . T.unpack $ c
             rmes = case runPDP11 code of
-                     Just output -> "@" ++ user
+                     Just output -> "<@" ++ show uid ++ ">"
                                     ++ ", I did. -- "
                                     ++ machine_version ++ "\n```"
                                     ++ output
                                     ++ "```"
-                     Nothing     -> user ++ ", your code is wrong."
+                     Nothing     -> "<@" ++ show uid ++ ">, your code is wrong."
         void $ doFetch $ CreateMessage ch (T.pack rmes) Nothing
     | "!help" `T.isPrefixOf` c = do
         void $ doFetch $ CreateMessage ch (T.pack (helpFormat ++ helpAddrMode)) Nothing
