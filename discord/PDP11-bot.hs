@@ -56,6 +56,8 @@ instance EventMap Handler (DiscordApp IO) where
         void $ doFetch $ CreateMessage ch (T.pack (helpFormat ++ helpAddrMode)) Nothing
     | otherwise = return ()
 
+mapEvent _ _ = return ()
+
 type PDP11App = (MessageCreateEvent :<>: MessageUpdateEvent) :> Handler
 
 instance EventHandler PDP11App IO
