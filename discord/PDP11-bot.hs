@@ -13,20 +13,17 @@ import Control.Monad.IO.Class
 import qualified Data.Text as T
 import Control.Monad
 import Data.List (intercalate)
-import PDP11
-import Assembler
-import Simulator
+import PDP11 hiding (version)
+import Assembler hiding (version)
+import Simulator hiding (version)
 import qualified PDP11 as Spec (version)
 import qualified Assembler as Asm (version)
 import qualified Simulator as Sim (version)
 import DiscordSecret (token)
 
-botVersion :: String
-botVersion = "0.2.0"
-
 instance DiscordAuth IO where
   auth    = return $ Bot token
-  version = return botVersion
+  version = return "0.2.1"
   runIO   = id
 
 instance MonadHttp (DiscordApp IO)
@@ -53,7 +50,8 @@ instance EventMap Handler (DiscordApp IO) where
                      Nothing     -> "<@" ++ show uid ++ ">, your code is wrong."
         void $ doFetch $ CreateMessage ch (T.pack rmes) Nothing
     | "!help" `T.isPrefixOf` c = do
-        void $ doFetch $ CreateMessage ch (T.pack (helpFormat ++ helpAddrMode)) Nothing
+        v <- ("version: " ++) <$> version
+        void $ doFetch $ CreateMessage ch (T.pack (v ++ "\n" ++ helpFormat ++ helpAddrMode)) Nothing
     | otherwise = return ()
 
 mapEvent _ _ = return ()
