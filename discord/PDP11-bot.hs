@@ -7,7 +7,6 @@ import Data.Proxy
 import GHC.TypeLits
 
 import Network.Discord
-import Network.HTTP.Req (MonadHttp)
 import Control.Monad.IO.Class
 
 import qualified Data.Text as T
@@ -23,16 +22,14 @@ import DiscordSecret (token)
 
 instance DiscordAuth IO where
   auth    = return $ Bot token
-  version = return "0.2.1"
+  version = return "0.2.2"
   runIO   = id
 
-instance MonadHttp (DiscordApp IO)
+data MnemonicHandler
 
-data Handler
-
-instance EventMap Handler (DiscordApp IO) where
-  type Domain   Handler = Message
-  type Codomain Handler = ()
+instance EventMap MnemonicHandler (DiscordApp IO) where
+  type Domain   MnemonicHandler = Message
+  type Codomain MnemonicHandler = ()
 
   mapEvent p (m@Message{ messageContent = c
                        , messageChannel = ch
@@ -54,9 +51,7 @@ instance EventMap Handler (DiscordApp IO) where
         void $ doFetch $ CreateMessage ch (T.pack (v ++ "\n" ++ helpFormat ++ helpAddrMode)) Nothing
     | otherwise = return ()
 
-mapEvent _ _ = return ()
-
-type PDP11App = (MessageCreateEvent :<>: MessageUpdateEvent) :> Handler
+type PDP11App = (MessageCreateEvent :<>: MessageUpdateEvent) :> MnemonicHandler
 
 instance EventHandler PDP11App IO
 
