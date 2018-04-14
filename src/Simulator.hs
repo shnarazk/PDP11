@@ -1,5 +1,6 @@
 {-# LANGUAGE
-    TemplateHaskell
+    GeneralizedNewtypeDeriving
+  , TemplateHaskell
   #-}
 
 module Simulator
@@ -13,12 +14,14 @@ module Simulator
     ) where
 
 import Control.Lens hiding ((<.))
+import Control.Monad.Identity
+import Control.Monad.State
 import Data.Array
 import PDP11 hiding (version)
 import Assembler hiding (version)
 
 version :: String
-version = "0.2.1"
+version = "0.3.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -27,22 +30,8 @@ version = "0.2.1"
 -- Note: (register %~ (// ...)) :: Machine -> Machine
 makeLenses ''Machine
 
-newtype State a = State ((->) Machine (Machine, a))
-
-instance Functor State where
-  fmap g (State f) = State $ \m -> let (m', x) = f m in (m', g x)
-
-instance Applicative State where
-  pure v = State $ \m -> (m, v)
-  (State g) <*> (State f) = State $ \m -> let (m', x') = f m
-                                              (m'', g') = g m'
-                                          in (m'', g' x')
-
-instance Monad State where
-  (State f) >> (State g) = State $ \x -> let (x', _) = f x in g x'
-  (State f) >>= g = State $ \m -> let (m', x') = f m
-                                      (State h) = g x'
-                                  in h m'
+newtype PDPState a = PDPState (State Machine a)
+  deriving (Functor, Applicative, Monad, MonadState Machine)
 
 initialMachine :: Machine -- memory is at left; register is at right.
 initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]) (chunk 8 [0, 2, 0, 4, 0, 6])
@@ -51,7 +40,7 @@ initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]) (chu
     chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
 
 runSimulator :: Machine -> [ASM] -> [Machine]
-runSimulator m l = scanl (flip execute) m l
+runSimulator m l = scanl runI m l
 
 runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
@@ -64,28 +53,29 @@ runPDP11 str = run <$> readASM str
                 combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b
         mnems = map (dropWhile (`elem` " \t")) $ lines str
 
-runI :: State a -> Machine -> Machine
-runI (State s) m = fst $ s m
+runI :: Machine -> ASM -> Machine
+runI m a = execState execute m
+  where (PDPState execute) = code a
 
-execute :: ASM -> Machine -> Machine
-execute (MOV s d) = runI $ do (_, x) <- fetchI s
-                              (p, _) <- fetchI d
-                              storeI p x
+code :: ASM -> PDPState ()
+code (MOV s d) = do (_, x) <- fetchI s
+                    (p, _) <- fetchI d
+                    storeI p x
 
-execute (ADD s d) = runI $ do (_, x) <- fetchI s
-                              (p, y) <- fetchI d
-                              storeI p (y + x)
+code (ADD s d) = do (_, x) <- fetchI s
+                    (p, y) <- fetchI d
+                    storeI p (y + x)
 
-execute (SUB s d) = runI $ do (_, x) <- fetchI s
-                              (p, y) <- fetchI d
-                              storeI p (y - x)
+code (SUB s d) = do (_, x) <- fetchI s
+                    (p, y) <- fetchI d
+                    storeI p (y - x)
 
-execute (MUL s d) = runI $ do (_, x) <- fetchI s
-                              (p, y) <- fetchI d
-                              storeI p (y * x)
+code (MUL s d) = do (_, x) <- fetchI s
+                    (p, y) <- fetchI d
+                    storeI p (y * x)
 
-execute (CLR d) = runI $ do (p, _) <- fetchI d
-                            storeI p 0
+code (CLR d)   = do (p, _) <- fetchI d
+                    storeI p 0
 
 -- successive memory access
 (!..) :: Array Int Int -> Int -> Int
@@ -100,28 +90,31 @@ i <.. x = (// [(i, div x 256), (i + 1, mod x 256)])
 i <. x = (// [(i, x)])
 
 -- returns a pair of left-hand value and right-hand value
-fetchI :: AddrMode -> State (Locator, Int)
-fetchI = State . fetchLR
+fetchI :: AddrMode -> PDPState (Locator, Int)
+fetchI a = do s <- get
+              let (b, s') = fetchLR a s
+              put s'
+              return b
 
-fetchLR :: AddrMode -> Machine -> (Machine, (Locator, Int))
-fetchLR (Register (Reg i)) s = (s, (AtRegister i, (s ^. register) ! i))
-fetchLR (Immediate n) s      = (s, (AsLiteral n, n))
-fetchLR (Index o (Reg i)) s  = (s, (AtMemory (i + o), (s ^. memory) !.. (i + o)))
-fetchLR (AutoInc (Reg j)) s  = (s', (AtMemory i, (s ^. memory) !.. i))
+fetchLR :: AddrMode -> Machine -> ((Locator, Int), Machine)
+fetchLR (Register (Reg i)) s = ((AtRegister i, (s ^. register) ! i), s)
+fetchLR (Immediate n) s      = ((AsLiteral n, n), s)
+fetchLR (Index o (Reg i)) s  = ((AtMemory (i + o), (s ^. memory) !.. (i + o)), s)
+fetchLR (AutoInc (Reg j)) s  = ((AtMemory i, (s ^. memory) !.. i), s')
   where i = (s ^. register) ! j
         s' = s & register %~ (j <. (i + 2))
-fetchLR (AutoDec (Reg j)) s  = (s', (AtMemory i, (s ^. memory) !.. i))
+fetchLR (AutoDec (Reg j)) s  = ((AtMemory i, (s ^. memory) !.. i), s')
   where i = ((s ^. register) ! j) - 2
         s' = s & register %~ (j <. i)
 fetchLR (Indirect a) s       =
   case l of
-    AtRegister _ -> (s', (AtMemory v, m !.. v))
-    AtMemory _   -> (s', (AtMemory v, m !.. v))
-    AsLiteral i  -> (s', (AtMemory (m !.. i), m !.. (m !.. i)))
-  where (s', (l, v)) = fetchLR a s
+    AtRegister _ -> ((AtMemory v, m !.. v)                , s')
+    AtMemory _   -> ((AtMemory v, m !.. v)                , s')
+    AsLiteral i  -> ((AtMemory (m !.. i), m !.. (m !.. i)), s')
+  where ((l, v), s') = fetchLR a s
         m = s' ^. memory
 
-storeI :: Locator -> Int -> State ()
-storeI (AtMemory i)   x = State $ \m -> (m & memory   %~ (i <.. x), ())
-storeI (AtRegister i) x = State $ \m -> (m & register %~ (i <.  x), ())
-storeI (AsLiteral i)  x = State $ \m -> (m & memory   %~ (i <.. x), ())
+storeI :: Locator -> Int -> PDPState ()
+storeI (AtMemory i)   x = do m <- get ; put (m & memory   %~ (i <.. x))
+storeI (AtRegister i) x = do m <- get ; put (m & register %~ (i <.  x))
+storeI (AsLiteral i)  x = do m <- get ; put (m & memory   %~ (i <.. x))
