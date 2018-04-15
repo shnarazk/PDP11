@@ -22,7 +22,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.4.1"
+version = "0.4.2"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -31,17 +31,21 @@ version = "0.4.1"
 -- Note: (register %~ (// ...)) :: Machine -> Machine
 makeLenses ''Machine
 
+type MemBlock = Array Int Int
+
 newtype PDPState a = PDPState (State Machine a)
   deriving (Functor, Applicative, Monad, MonadState Machine)
 
 initialMachine :: Machine -- memory is at left; register is at right.
 initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]) (chunk 8 [0, 2, 0, 4, 0, 6])
-  where
-    chunk :: Int -> [Int] -> Array Int Int
-    chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
+  where chunk :: Int -> [Int] -> MemBlock
+        chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
 
 runSimulator :: Machine -> [ASM] -> [Machine]
 runSimulator m l = scanl runI m l
+  where runI :: Machine -> ASM -> Machine
+        runI m a = execState execute m
+          where (PDPState execute) = code a
 
 runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
@@ -53,10 +57,6 @@ runPDP11 str@(assemble -> Just program) = Just . unlines $ zipWith (++) instrs s
         mnems = map (dropWhile (`elem` " \t")) $ lines str
         states = map show $ runSimulator' program
 runPDP11 _ = Nothing
-
-runI :: Machine -> ASM -> Machine
-runI m a = execState execute m
-  where (PDPState execute) = code a
 
 code :: ASM -> PDPState ()
 code (MOV s d) = do (_, x) <- fetchI s
@@ -78,40 +78,50 @@ code (MUL s d) = do (_, x) <- fetchI s
 code (CLR d)   = do (p, _) <- fetchI d
                     storeI p 0
 
+--------------------------------------------------------------------------------
+
 -- successive memory access
-(!..) :: Array Int Int -> Int -> Int
+(!..) :: MemBlock -> Int -> Int
 v !.. i = (v ! i) * 256 + (v ! (i + 1))
 
 -- updater of byte array index for an Int
-(<..) :: Int -> Int -> (Array Int Int -> Array Int Int)
+(<..) :: Int -> Int -> (MemBlock -> MemBlock)
 i <.. x = (// [(i, div x 256), (i + 1, mod x 256)])
 
 -- updater of Int array index for an Int
-(<.) :: Int -> Int -> (Array Int Int -> Array Int Int)
+(<.) :: Int -> Int -> (MemBlock -> MemBlock)
 i <. x = (// [(i, x)])
 
+accessI :: Getting MemBlock Machine MemBlock -> PDPState MemBlock
+accessI block = (^. block) <$> get
+
+updateI :: ASetter Machine Machine MemBlock MemBlock -> (MemBlock -> MemBlock) -> PDPState ()
+updateI block updates = do s <- get; put $ s & block %~ updates
+
 fetchI :: AddrMode -> PDPState (Locator, Int)
-fetchI (Register (Reg i)) = do Machine{ _register = reg } <- get
+fetchI (Register (Reg i)) = do reg <- accessI register
                                return (AtRegister i, reg ! i)
 fetchI (Immediate n)      = do return (AsLiteral n, n)
-fetchI (Index o (Reg i))  = do Machine{ _memory = mem } <- get
+fetchI (Index o (Reg i))  = do mem <- accessI memory
                                return (AtMemory (i + o), mem !.. (i + o))
-fetchI (AutoInc (Reg j))  = do s@Machine{ _register = reg } <- get
+fetchI (AutoInc (Reg j))  = do reg <- accessI register
+                               mem <- accessI memory
                                let i = reg ! j
-                               put $ s & register %~ (j <. (i + 2))
-                               return (AtMemory i, (s ^. memory) !.. i)
-fetchI (AutoDec (Reg j))  = do s@Machine{ _register = reg } <- get
+                               updateI register (j <. (i + 2))
+                               return (AtMemory i, mem !.. i)
+fetchI (AutoDec (Reg j))  = do reg <- accessI register
+                               mem <- accessI memory
                                let i = (reg ! j) - 2
-                               put $ s & register %~ (j <. i)
-                               return (AtMemory i, (s ^. memory) !.. i)
+                               updateI register (j <. i)
+                               return (AtMemory i, mem !.. i)
 fetchI (Indirect a)       = do (l, v) <- fetchI a
-                               Machine{ _memory = mem } <- get
+                               mem <- accessI memory
                                case l of
                                  AtRegister _ -> return (AtMemory v, mem !.. v)
                                  AtMemory _   -> return (AtMemory v, mem !.. v)
                                  AsLiteral i  -> return (AtMemory (mem !.. i), mem !.. (mem !.. i))
 
 storeI :: Locator -> Int -> PDPState ()
-storeI (AtMemory i)   x = do m <- get ; put (m & memory   %~ (i <.. x))
-storeI (AtRegister i) x = do m <- get ; put (m & register %~ (i <.  x))
-storeI (AsLiteral i)  x = do m <- get ; put (m & memory   %~ (i <.. x))
+storeI (AtMemory i)   x = updateI memory (i <.. x)
+storeI (AtRegister i) x = updateI register (i <. x)
+storeI (AsLiteral i)  x = updateI memory (i <.. x)
