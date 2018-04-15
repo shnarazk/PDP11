@@ -1,5 +1,6 @@
 {-# LANGUAGE
     GeneralizedNewtypeDeriving
+  , RecordWildCards
   , TemplateHaskell
   #-}
 
@@ -21,7 +22,7 @@ import PDP11 hiding (version)
 import Assembler hiding (version)
 
 version :: String
-version = "0.3.0"
+version = "0.4.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -89,30 +90,26 @@ i <.. x = (// [(i, div x 256), (i + 1, mod x 256)])
 (<.) :: Int -> Int -> (Array Int Int -> Array Int Int)
 i <. x = (// [(i, x)])
 
--- returns a pair of left-hand value and right-hand value
 fetchI :: AddrMode -> PDPState (Locator, Int)
-fetchI a = do s <- get
-              let (b, s') = fetchLR a s
-              put s'
-              return b
-
-fetchLR :: AddrMode -> Machine -> ((Locator, Int), Machine)
-fetchLR (Register (Reg i)) s = ((AtRegister i, (s ^. register) ! i), s)
-fetchLR (Immediate n) s      = ((AsLiteral n, n), s)
-fetchLR (Index o (Reg i)) s  = ((AtMemory (i + o), (s ^. memory) !.. (i + o)), s)
-fetchLR (AutoInc (Reg j)) s  = ((AtMemory i, (s ^. memory) !.. i), s')
-  where i = (s ^. register) ! j
-        s' = s & register %~ (j <. (i + 2))
-fetchLR (AutoDec (Reg j)) s  = ((AtMemory i, (s ^. memory) !.. i), s')
-  where i = ((s ^. register) ! j) - 2
-        s' = s & register %~ (j <. i)
-fetchLR (Indirect a) s       =
-  case l of
-    AtRegister _ -> ((AtMemory v, m !.. v)                , s')
-    AtMemory _   -> ((AtMemory v, m !.. v)                , s')
-    AsLiteral i  -> ((AtMemory (m !.. i), m !.. (m !.. i)), s')
-  where ((l, v), s') = fetchLR a s
-        m = s' ^. memory
+fetchI (Register (Reg i)) = do Machine{ _register = reg } <- get
+                               return (AtRegister i, reg ! i)
+fetchI (Immediate n)      = do return (AsLiteral n, n)
+fetchI (Index o (Reg i))  = do Machine{ _memory = mem } <- get
+                               return (AtMemory (i + o), mem !.. (i + o))
+fetchI (AutoInc (Reg j))  = do s@Machine{ _register = reg } <- get
+                               let i = reg ! j
+                               put $ s & register %~ (j <. (i + 2))
+                               return (AtMemory i, (s ^. memory) !.. i)
+fetchI (AutoDec (Reg j))  = do s@Machine{ _register = reg } <- get
+                               let i = (reg ! j) - 2
+                               put $ s & register %~ (j <. i)
+                               return (AtMemory i, (s ^. memory) !.. i)
+fetchI (Indirect a)       = do (l, v) <- fetchI a
+                               Machine{ _memory = mem } <- get
+                               case l of
+                                 AtRegister _ -> return (AtMemory v, mem !.. v)
+                                 AtMemory _   -> return (AtMemory v, mem !.. v)
+                                 AsLiteral i  -> return (AtMemory (mem !.. i), mem !.. (mem !.. i))
 
 storeI :: Locator -> Int -> PDPState ()
 storeI (AtMemory i)   x = do m <- get ; put (m & memory   %~ (i <.. x))
