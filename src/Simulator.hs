@@ -2,6 +2,7 @@
     GeneralizedNewtypeDeriving
   , RecordWildCards
   , TemplateHaskell
+  , ViewPatterns
   #-}
 
 module Simulator
@@ -15,14 +16,13 @@ module Simulator
     ) where
 
 import Control.Lens hiding ((<.))
-import Control.Monad.Identity
 import Control.Monad.State
 import Data.Array
 import PDP11 hiding (version)
-import Assembler hiding (version)
+import Assembler (assemble)
 
 version :: String
-version = "0.4.0"
+version = "0.4.1"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -47,12 +47,12 @@ runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
 
 runPDP11 :: String -> Maybe String
-runPDP11 str = run <$> readASM str
-  where run program = unlines $ concatMap (\(n, m) -> [n, show m]) $ zip instrs states
-          where states = runSimulator' program
-                instrs = "#0 Initial state" : zipWith3 combine [1 :: Int .. ] mnems program
-                combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b
+runPDP11 str@(assemble -> Just program) = Just . unlines $ zipWith (++) instrs states
+  where instrs = "#0 Initial state\n" : zipWith3 combine [1 :: Int .. ] mnems program
+        combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b ++ "\n"
         mnems = map (dropWhile (`elem` " \t")) $ lines str
+        states = map show $ runSimulator' program
+runPDP11 _ = Nothing
 
 runI :: Machine -> ASM -> Machine
 runI m a = execState execute m
