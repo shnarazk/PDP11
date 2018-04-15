@@ -24,7 +24,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.5.2"
+version = "0.6.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -122,18 +122,20 @@ fetchI (Register (Reg i)) = do reg <- accessI register
 fetchI (Immediate n)      = do incrementPC
                                return (AsLiteral n, n)
 fetchI (Index o (Reg i))  = do incrementPC
+                               reg <- accessI register
                                mem <- accessI memory
-                               return (AtMemory (i + o), mem !.. (i + o))
+                               let n = reg ! i + o
+                               return (AtMemory n, mem !.. n)
 fetchI (AutoInc (Reg j))  = do reg <- accessI register
                                mem <- accessI memory
-                               let i = reg ! j
-                               updateI register (j <. (i + 2))
-                               return (AtMemory i, mem !.. i)
+                               let n = reg ! j
+                               updateI register (j <. (n + 2))
+                               return (AtMemory n, mem !.. n)
 fetchI (AutoDec (Reg j))  = do reg <- accessI register
                                mem <- accessI memory
-                               let i = reg ! j - 2
-                               updateI register (j <. i)
-                               return (AtMemory i, mem !.. i)
+                               let n = reg ! j - 2
+                               updateI register (j <. n)
+                               return (AtMemory n, mem !.. n)
 fetchI (Indirect a)       = do (l, v) <- fetchI a
                                mem <- accessI memory
                                case l of
