@@ -22,7 +22,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.5.0"
+version = "0.5.1"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -83,14 +83,17 @@ code (CLR d)   = do (p, _) <- fetchI d
 -- successive memory access
 (!..) :: MemBlock -> Int -> Int
 v !.. i = (v ! i) * 256 + (v ! (i + 1))
+infixr 9 !..
 
 -- updater of byte array index for an Int
 (<..) :: Int -> Int -> (MemBlock -> MemBlock)
 i <.. x = (// [(i, div x 256), (i + 1, mod x 256)])
+infixl 9 <..
 
 -- updater of Int array index for an Int
 (<.) :: Int -> Int -> (MemBlock -> MemBlock)
 i <. x = (// [(i, x)])
+infixl 9 <.
 
 accessI :: Getting MemBlock Machine MemBlock -> PDPState MemBlock
 accessI block = (^. block) <$> get
@@ -100,7 +103,7 @@ updateI block updates = do s <- get; put $ s & block %~ updates
 
 incrementPC :: PDPState ()
 incrementPC = do reg <- accessI register
-                 updateI register (7 <. ((reg ! 7) + 2))
+                 updateI register (7 <. (reg ! 7 + 2))
 
 fetchI :: AddrMode -> PDPState (Locator, Int)
 fetchI (Register (Reg i)) = do reg <- accessI register
@@ -117,7 +120,7 @@ fetchI (AutoInc (Reg j))  = do reg <- accessI register
                                return (AtMemory i, mem !.. i)
 fetchI (AutoDec (Reg j))  = do reg <- accessI register
                                mem <- accessI memory
-                               let i = (reg ! j) - 2
+                               let i = reg ! j - 2
                                updateI register (j <. i)
                                return (AtMemory i, mem !.. i)
 fetchI (Indirect a)       = do (l, v) <- fetchI a
@@ -125,7 +128,7 @@ fetchI (Indirect a)       = do (l, v) <- fetchI a
                                case l of
                                  AtRegister _ -> return (AtMemory v, mem !.. v)
                                  AtMemory _   -> return (AtMemory v, mem !.. v)
-                                 AsLiteral i  -> return (AtMemory (mem !.. i), mem !.. (mem !.. i))
+                                 AsLiteral i  -> return (AtMemory (mem !.. i), mem !.. mem !.. i)
 
 storeI :: Locator -> Int -> PDPState ()
 storeI (AtMemory i)   x = updateI memory (i <.. x)
