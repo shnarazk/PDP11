@@ -22,7 +22,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.4.2"
+version = "0.5.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -37,7 +37,7 @@ newtype PDPState a = PDPState (State Machine a)
   deriving (Functor, Applicative, Monad, MonadState Machine)
 
 initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]) (chunk 8 [0, 2, 0, 4, 0, 6])
+initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]) (chunk 8 [0, 2, 0, 4, 0, 6, 1, 16])
   where chunk :: Int -> [Int] -> MemBlock
         chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
 
@@ -45,7 +45,7 @@ runSimulator :: Machine -> [ASM] -> [Machine]
 runSimulator m l = scanl runI m l
   where runI :: Machine -> ASM -> Machine
         runI m a = execState execute m
-          where (PDPState execute) = code a
+          where (PDPState execute) = do incrementPC; code a
 
 runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
@@ -98,11 +98,17 @@ accessI block = (^. block) <$> get
 updateI :: ASetter Machine Machine MemBlock MemBlock -> (MemBlock -> MemBlock) -> PDPState ()
 updateI block updates = do s <- get; put $ s & block %~ updates
 
+incrementPC :: PDPState ()
+incrementPC = do reg <- accessI register
+                 updateI register (7 <. ((reg ! 7) + 2))
+
 fetchI :: AddrMode -> PDPState (Locator, Int)
 fetchI (Register (Reg i)) = do reg <- accessI register
                                return (AtRegister i, reg ! i)
-fetchI (Immediate n)      = do return (AsLiteral n, n)
-fetchI (Index o (Reg i))  = do mem <- accessI memory
+fetchI (Immediate n)      = do incrementPC
+                               return (AsLiteral n, n)
+fetchI (Index o (Reg i))  = do incrementPC
+                               mem <- accessI memory
                                return (AtMemory (i + o), mem !.. (i + o))
 fetchI (AutoInc (Reg j))  = do reg <- accessI register
                                mem <- accessI memory
