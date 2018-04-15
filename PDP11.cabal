@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2cf35016845ab9fde517729d139d141a0dbf7e988ee8d7fc7b1f32f1a3bb5d0c
+-- hash: 0f4b3a3396364c63b9d79719f17770a0e0999468d614d95d77856877ef53245b
 
 name:           PDP11
 version:        0.1.0.0
@@ -81,6 +81,7 @@ test-suite PDP11-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      SimulatorSpec
       Paths_PDP11
   hs-source-dirs:
       test
@@ -89,6 +90,7 @@ test-suite PDP11-test
       PDP11
     , array
     , base >=4.7 && <5
+    , hspec
     , lens
     , mtl
     , parsec >=3.1

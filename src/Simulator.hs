@@ -9,6 +9,8 @@ module Simulator
     (
       version
     , Machine(..)
+    , makePDP11
+    , makePDP11'
     , runPDP11
     , initialMachine
     , runSimulator
@@ -22,7 +24,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.5.1"
+version = "0.5.2"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -36,10 +38,19 @@ type MemBlock = Array Int Int
 newtype PDPState a = PDPState (State Machine a)
   deriving (Functor, Applicative, Monad, MonadState Machine)
 
-initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = Machine (chunk 16 [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]) (chunk 8 [0, 2, 0, 4, 0, 6, 1, 16])
+makePDP11' :: (Int, Int) -> [Int] -> [Int] -> Machine
+makePDP11' (m, r) b1 b2 = Machine (chunk m b1) (chunk r b2)
   where chunk :: Int -> [Int] -> MemBlock
         chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
+
+makePDP11 :: [Int] -> [Int] -> Machine
+makePDP11 b1 b2 = makePDP11' (length b1, length b2) b1 b2
+
+initialMachine :: Machine -- memory is at left; register is at right.
+initialMachine = makePDP11'
+  (16,8)
+  [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]
+  [0, 2, 0, 4, 0, 6, 1, 16]
 
 runSimulator :: Machine -> [ASM] -> [Machine]
 runSimulator m l = scanl runI m l
