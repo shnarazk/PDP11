@@ -22,7 +22,11 @@ import DiscordSecret (token)
 
 instance DiscordAuth IO where
   auth    = return $ Bot token
-  version = return "0.2.2"
+  version = return $ intercalate ", " [ "0.2.3"
+                                      , "spec: " ++ Spec.version
+                                      , "assembler: " ++ Asm.version
+                                      , "simulator: " ++ Sim.version
+                                      ]
   runIO   = id
 
 data MnemonicHandler
@@ -37,11 +41,12 @@ instance EventMap MnemonicHandler (DiscordApp IO) where
              )
     | bot = return ()
     | "```PDP" `T.isPrefixOf` c = do
+        ver <- version
         let code = unlines . takeWhile ("```" /=) . tail . lines . T.unpack $ c
             rmes = case runPDP11 code of
                      Just output -> "<@" ++ show uid ++ ">"
                                     ++ ", I did. -- "
-                                    ++ machine_version ++ "\n```"
+                                    ++ ver ++ "\n```"
                                     ++ output
                                     ++ "```"
                      Nothing     -> "<@" ++ show uid ++ ">, your code is wrong."
@@ -57,12 +62,6 @@ instance EventHandler PDP11App IO
 
 main :: IO ()
 main = runBot (Proxy :: Proxy (IO PDP11App))
-
-machine_version :: String
-machine_version = intercalate ", " [ "specification: " ++ Spec.version
-                                   , "assembler: " ++ Asm.version
-                                   , "simulator: " ++ Sim.version
-                                   ]
 
 helpFormat = "\n\
 \Format\n\n\
