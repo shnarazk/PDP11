@@ -9,11 +9,13 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.4.0"
+version = "0.4.1"
 
 assemble :: String -> Either String [ASM]
-assemble str = case parse readASMs "@" str of
-                Left err -> Left (show err)
+assemble str = case parse readASMs "ERROR" str of
+                Left err -> let l = lines str !! (sourceLine (errorPos err) - 1)
+                                i = replicate (sourceColumn (errorPos err) -1) ' ' ++ "^\n"
+                            in Left (l ++ "\n" ++ i ++ show err)
                 Right x  -> Right x
 
 readASMs :: Parsec String () [ASM]
