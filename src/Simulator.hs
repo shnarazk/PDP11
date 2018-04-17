@@ -62,12 +62,12 @@ runSimulator' :: [ASM] -> [Machine]
 runSimulator' l = runSimulator initialMachine l
 
 runPDP11 :: String -> Maybe String
-runPDP11 str@(assemble -> Just program) = Just . unlines $ zipWith (++) instrs states
+runPDP11 str@(assemble -> Right program) = Just . unlines $ zipWith (++) instrs states
   where instrs = "#0 Initial state\n" : zipWith3 combine [1 :: Int .. ] mnems program
         combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b ++ "\n"
         mnems = map (dropWhile (`elem` " \t")) $ lines str
         states = map show $ runSimulator' program
-runPDP11 _ = Nothing
+runPDP11 str@(assemble -> Left message) = Just message
 
 code :: ASM -> PDPState ()
 code (MOV s d) = do (_, x) <- fetchI s

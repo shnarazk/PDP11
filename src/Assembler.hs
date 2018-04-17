@@ -9,12 +9,12 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.3.0"
+version = "0.4.0"
 
-assemble :: String -> Maybe [ASM]
-assemble str = case parse readASMs "stdin" str of
-                Left err -> Nothing
-                Right x  -> Just x
+assemble :: String -> Either String [ASM]
+assemble str = case parse readASMs "@" str of
+                Left err -> Left (show err)
+                Right x  -> Right x
 
 readASMs :: Parsec String () [ASM]
 readASMs = many1 (spaces *> commands <* newline)
@@ -25,11 +25,14 @@ readASMs = many1 (spaces *> commands <* newline)
                       , asmMUL
                       , asmCLR
                       ]
+--               <?> "MOV, ADD, SUB, MUL, or CLR."
 
 registerId :: Parsec String () RegId
 registerId = do
-  r <- char 'R' *> many1 digit
-  return $ Reg (read r)
+  r <-   char 'R' *> integer
+  if 0 <= r && r <= 7
+    then return $ Reg r
+    else fail "Error: the register number should be 0 to 7."
 
 addrMode :: Parsec String () AddrMode
 addrMode = choice [ addrModeRegister
@@ -39,6 +42,7 @@ addrMode = choice [ addrModeRegister
                   , addrModeAutoDec
                   , addrModeIndirect
                   ]
+           <?> "one of 'Ri', '(Ri)+', '-(Ri)', 'n(Ri)', '@Ri', '@(Ri)+', '@-(Ri)', '@n(Ri), '#n'"
 
 addrModeRegister :: Parsec String () AddrMode
 addrModeRegister = Register <$> registerId
@@ -84,19 +88,19 @@ twoAddrs = do
   return $ (x, y)
 
 asmMOV :: Parsec String () ASM
-asmMOV = uncurry MOV <$> (string "MOV" *> twoAddrs)
+asmMOV = uncurry MOV <$> (try (string "MOV ") *> twoAddrs)
 
 asmADD :: Parsec String () ASM
-asmADD = uncurry ADD <$> (string "ADD" *> twoAddrs)
+asmADD = uncurry ADD <$> (try (string "ADD ") *> twoAddrs)
 
 asmSUB :: Parsec String () ASM
-asmSUB = uncurry ADD <$> (string "SUB" *> twoAddrs)
+asmSUB = uncurry ADD <$> (try (string "SUB ") *> twoAddrs)
 
 asmMUL :: Parsec String () ASM
-asmMUL = uncurry ADD <$> (string "MUL" *> twoAddrs)
+asmMUL = uncurry ADD <$> (try (string "MUL ") *> twoAddrs)
 
 asmCLR :: Parsec String () ASM
-asmCLR = CLR <$> (string "CLR" *> oneAddr)
+asmCLR = CLR <$> (try (string "CLR ") *> oneAddr)
 
 integer :: Parsec String () Int
 integer = read <$> many1 digit
