@@ -18,9 +18,10 @@ M: [0,2,0,4,0,8,1,255,0,0,0,0,0,0,0,0], R: [10,2,0,4,0,6,0,0]
 
 #### TODO
 
-- [x] Text.Parsec -- parse a Assembly
+- [x] Text.Parsec -- parse a language
 - [x] Monad -- make an interpreter
 - [x] MTL -- don't invent something old again
 - [x] Lens -- use concise accessors
-- [ ] Servant -- run as a web server
+- [x] Hspec -- automatic test
 - [x] Discord-hs -- make a bot
+- [ ] Servant -- run as a web server
