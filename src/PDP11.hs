@@ -94,7 +94,7 @@ data ASM
   = MOV AddrMode AddrMode
   | ADD AddrMode AddrMode
   | SUB AddrMode AddrMode
-  | MUL AddrMode AddrMode
+--  | MUL AddrMode AddrMode
   | CLR AddrMode
   deriving (Eq, Ord, Read, Show)
 

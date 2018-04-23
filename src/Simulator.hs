@@ -24,7 +24,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.6.1"
+version = "0.7.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -84,9 +84,9 @@ code (SUB s d) = do (_, x) <- fetchI s
                     (p, y) <- fetchI d
                     storeI p (y - x)
 
-code (MUL s d) = do (_, x) <- fetchI s
-                    (p, y) <- fetchI d
-                    storeI p (y * x)
+-- code (MUL s d) = do (_, x) <- fetchI s
+--                     (p, y) <- fetchI d
+--                     storeI p (y * x)
 
 code (CLR d)   = do (p, _) <- fetchI d
                     storeI p 0
