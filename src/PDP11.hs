@@ -7,7 +7,7 @@ module PDP11
     , AddrMode(..)
     , ASM(..)
     , pdp11
-    , fromASM
+    , toBitBlocks
 --    , (.+.)
 --    , fromInt
 --    , fromList
@@ -18,7 +18,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.2.1"
+version = "0.2.3"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -108,9 +108,21 @@ data BitBlock
   deriving (Eq, Ord)
 
 instance Show BitBlock where
-  show (BitBlock v f t)
-    =  [ if testBit v n then '1' else '0' | n <- [t-f-1, t -f -2 .. 0]]
-    ++ replicate f '0'
+  show (BitBlock v f t) = snd . insertP $ [ padding n | n <- seq ] ++ replicate f '0'
+    where
+      padding n
+        | n == -1     =  '_'
+        | testBit v n = '1'
+        | otherwise   = '0'
+      seq = [t-f-1, t -f -2 .. 0]
+      insertP [a] = (1, [a])
+      insertP (a:b)
+        | mod n 4 == 0 = (n + 1, a : '_' : b')
+        | otherwise    = (n + 1, a : b')
+        where
+          (n, b') = insertP b
+    
+
 
 instance Num BitBlock where
   b1 + b2 = BitBlock (shiftR val from')
@@ -148,7 +160,7 @@ fromAddrMode (AutoDec (Reg r))  = (fromList [1,0,0] .<. 3) .|. (fromInt 3 r .<. 
 fromAddrMode (Indirect a )      = (fromList [0,0,1] .<. 3) .|. (fromAddrMode a)
 
 toBitBlock :: ASM -> BitBlock
-toBitBlock (CLR a1)    = (fromList [0,0,0,0, 1,0,1,0, 0,0,0] .<. 6)
+toBitBlock (CLR a1)    = (fromList [0,0,0,0, 1,0,1,0, 0,0] .<. 6)
                          .|. (fromAddrMode a1 .<. 0)
 toBitBlock (MOV a1 a2) = (fromList [0,0,0,1] .<. 12)
                          .|. (fromAddrMode a1 .<. 6)
@@ -160,6 +172,36 @@ toBitBlock (ADD a1 a2) = (fromList [1,1,1,0] .<. 12)
                          .|. (fromAddrMode a1 .<. 6)
                          .|. (fromAddrMode a2 .<. 0)
 
-fromASM :: ASM -> String
-fromASM a = [ if testBit v n then '1' else '0' | n <- [15,14..0]]
-  where (BitBlock v _ _) = toBitBlock a
+-- fromASM :: ASM -> String
+-- fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
+
+extends :: AddrMode -> Bool
+extends (Immediate _) = True
+extends (Index i _)   = True
+extends _            = False
+
+toExtend :: AddrMode -> BitBlock
+toExtend (Immediate i) = fromInt 16 i
+toExtend (Index i _)   = fromInt 16 i
+toExtend (Indirect a)  = toExtend a
+toExtend a             = error $ "toExtend called with an invalid AddrMode " ++ show a
+
+toBitBlocks :: ASM -> [BitBlock]
+toBitBlocks m@(CLR a1) = case extends a1 of
+                           True -> [toBitBlock m, toExtend a1]
+                           False -> [toBitBlock m]
+toBitBlocks m@(MOV a1 a2) = case (extends a1, extends a2) of
+                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
+                              (True, False)  -> [toBitBlock m, toExtend a1]
+                              (False, True)  -> [toBitBlock m, toExtend a2]
+                              (False, False) -> [toBitBlock m]
+toBitBlocks m@(SUB a1 a2) = case (extends a1, extends a2) of
+                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
+                              (True, False)  -> [toBitBlock m, toExtend a1]
+                              (False, True)  -> [toBitBlock m, toExtend a2]
+                              (False, False) -> [toBitBlock m]
+toBitBlocks m@(ADD a1 a2) = case (extends a1, extends a2) of
+                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
+                              (True, False)  -> [toBitBlock m, toExtend a1]
+                              (False, True)  -> [toBitBlock m, toExtend a2]
+                              (False, False) -> [toBitBlock m]
