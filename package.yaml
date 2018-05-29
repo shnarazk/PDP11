@@ -31,8 +31,8 @@ library:
 
 executables:
   PDP11-exe:
-    main:                Main.hs
     source-dirs:         app
+    main:                Main.hs
     ghc-options:
       - -threaded
       - -rtsopts

@@ -30,7 +30,7 @@ botMode = unsafePerformIO $ newIORef Enable
 
 instance DiscordAuth IO where
   auth    = return $ Bot token
-  version = return $ intercalate ", " [ "0.4.0"
+  version = return $ intercalate ", " [ "0.4.1"
                                       , "spec: " ++ Spec.version
                                       , "assembler: " ++ Asm.version
                                       , "simulator: " ++ Sim.version
@@ -70,15 +70,15 @@ instance EventMap MnemonicHandler (DiscordApp IO) where
         m <- liftIO $ readIORef botMode
         when (m == Enable) $ void $ doFetch $ CreateMessage ch (T.pack (rmes ++ bits)) Nothing
         return ()
-    | "!enable PDP" `T.isPrefixOf` c = do
+    | "restart" `T.isInfixOf` c && "431666856785346560" `T.isInfixOf` c = do
         when (show uid == admin) $ do
           liftIO $ writeIORef botMode Enable
-          void $ doFetch $ CreateMessage ch (T.pack "Hi, admin!") Nothing
+          void $ doFetch $ CreateMessage ch (T.pack $ "Hi, <@" ++ admin ++ ">!") Nothing
         return ()
-    | "!disable PDP" `T.isPrefixOf` c = do
+    | "stop" `T.isInfixOf` c && "431666856785346560" `T.isInfixOf` c = do
         when (show uid == admin) $ do
           liftIO $ writeIORef botMode Disable
-          void $ doFetch $ CreateMessage ch (T.pack "Bye, admin!") Nothing
+          void $ doFetch $ CreateMessage ch (T.pack $ "Bye, <@" ++ admin ++ ">!") Nothing
         return ()
     | "!help" `T.isPrefixOf` c = do
         v <- ("version: " ++) <$> version
