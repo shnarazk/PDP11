@@ -11,6 +11,8 @@ import Control.Monad.IO.Class
 
 import qualified Data.Text as T
 import Control.Monad
+import Data.IORef
+import System.IO.Unsafe (unsafePerformIO)
 import Data.List (intercalate)
 import PDP11 hiding (version)
 import Assembler hiding (version)
@@ -18,11 +20,17 @@ import Simulator hiding (version)
 import qualified PDP11 as Spec (version)
 import qualified Assembler as Asm (version)
 import qualified Simulator as Sim (version)
-import DiscordSecret (token)
+import DiscordSecret (token, admin)
+
+data Mode = Enable | Disable
+  deriving (Eq, Show)
+
+botMode :: IORef Mode
+botMode = unsafePerformIO $ newIORef Enable
 
 instance DiscordAuth IO where
   auth    = return $ Bot token
-  version = return $ intercalate ", " [ "0.3.0"
+  version = return $ intercalate ", " [ "0.4.0"
                                       , "spec: " ++ Spec.version
                                       , "assembler: " ++ Asm.version
                                       , "simulator: " ++ Sim.version
@@ -59,10 +67,23 @@ instance EventMap MnemonicHandler (DiscordApp IO) where
               Right [as] -> concatMap (printer l) (zip [0 ..] (toBitBlocks as))
               Left mes -> show mes
             bits = "\n```\n" ++ concatMap toBit code ++ "```\n"
-        void $ doFetch $ CreateMessage ch (T.pack (rmes ++ bits)) Nothing
+        m <- liftIO $ readIORef botMode
+        when (m == Enable) $ void $ doFetch $ CreateMessage ch (T.pack (rmes ++ bits)) Nothing
+        return ()
+    | "!enable PDP" `T.isPrefixOf` c = do
+        when (show uid == admin) $ do
+          liftIO $ writeIORef botMode Enable
+          void $ doFetch $ CreateMessage ch (T.pack "Hi, admin!") Nothing
+        return ()
+    | "!disable PDP" `T.isPrefixOf` c = do
+        when (show uid == admin) $ do
+          liftIO $ writeIORef botMode Disable
+          void $ doFetch $ CreateMessage ch (T.pack "Bye, admin!") Nothing
+        return ()
     | "!help" `T.isPrefixOf` c = do
         v <- ("version: " ++) <$> version
         void $ doFetch $ CreateMessage ch (T.pack (v ++ "\n" ++ helpFormat ++ helpAddrMode)) Nothing
+        return ()
     | otherwise = return ()
 
 type PDP11App = (MessageCreateEvent :<>: MessageUpdateEvent) :> MnemonicHandler
