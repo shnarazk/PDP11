@@ -18,7 +18,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.3.0"
+version = "0.4.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -70,7 +70,8 @@ pdp11 _ = Machine (chunk 16 [0, 10, 0, 20, 0, 40, 1, 255]) (chunk 8 [0, 2, 0, 4,
     -- psw' = replicate 5 False
 
 instance Show Machine where
-  show (Machine m r) = "M:" ++ show (elems m) ++ ", R:" ++ show (elems r)
+  -- show (Machine m r) = "M:" ++ show (elems m) ++ ", R:" ++ show (elems r)
+  show (Machine m r) = "M(rev):" ++ show (reverse (elems m)) ++ ", R(rev):" ++ show (reverse (elems r))
 
 data Locator
   = AtRegister Int
