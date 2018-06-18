@@ -20,11 +20,12 @@ module Simulator
 import Control.Lens hiding ((<.))
 import Control.Monad.State
 import Data.Array
+import Data.Bits
 import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.7.0"
+version = "0.8.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -90,6 +91,20 @@ code (SUB s d) = do (_, x) <- fetchI s
 
 code (CLR d)   = do (p, _) <- fetchI d
                     storeI p 0
+
+code (BIC s d) = do (_, x) <- fetchI s
+                    (p, y) <- fetchI d
+                    storeI p (y .&. x)
+
+code (BIS s d) = do (_, x) <- fetchI s
+                    (p, y) <- fetchI d
+                    storeI p (y .|. x)
+
+code (INC s)   = do (p, x) <- fetchI s
+                    storeI p (x + 1)
+
+code (DEC s)   = do (p, x) <- fetchI s
+                    storeI p (x - 1)
 
 --------------------------------------------------------------------------------
 

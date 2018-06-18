@@ -18,7 +18,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.2.3"
+version = "0.3.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -94,6 +94,10 @@ data ASM
   = MOV AddrMode AddrMode
   | ADD AddrMode AddrMode
   | SUB AddrMode AddrMode
+  | BIC AddrMode AddrMode
+  | BIS AddrMode AddrMode
+  | INC AddrMode
+  | DEC AddrMode
 --  | MUL AddrMode AddrMode
   | CLR AddrMode
   deriving (Eq, Ord, Read, Show)
@@ -171,6 +175,16 @@ toBitBlock (SUB a1 a2) = (fromList [0,1,1,0] .<. 12)
 toBitBlock (ADD a1 a2) = (fromList [1,1,1,0] .<. 12)
                          .|. (fromAddrMode a1 .<. 6)
                          .|. (fromAddrMode a2 .<. 0)
+toBitBlock (BIC a1 a2) = (fromList [0,1,0,0] .<. 12)
+                         .|. (fromAddrMode a1 .<. 6)
+                         .|. (fromAddrMode a2 .<. 0)
+toBitBlock (BIS a1 a2) = (fromList [0,1,0,1] .<. 12)
+                         .|. (fromAddrMode a1 .<. 6)
+                         .|. (fromAddrMode a2 .<. 0)
+toBitBlock (INC a1)    = (fromList [0,0,0,0,1,0,1,0,1,0] .<. 6)
+                         .|. (fromAddrMode a1 .<. 0)
+toBitBlock (DEC a1)    = (fromList [0,0,0,0,1,0,1,0,1,1] .<. 6)
+                         .|. (fromAddrMode a1 .<. 0)
 
 -- fromASM :: ASM -> String
 -- fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
@@ -205,3 +219,19 @@ toBitBlocks m@(ADD a1 a2) = case (extends a1, extends a2) of
                               (True, False)  -> [toBitBlock m, toExtend a1]
                               (False, True)  -> [toBitBlock m, toExtend a2]
                               (False, False) -> [toBitBlock m]
+toBitBlocks m@(BIC a1 a2) = case (extends a1, extends a2) of
+                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
+                              (True, False)  -> [toBitBlock m, toExtend a1]
+                              (False, True)  -> [toBitBlock m, toExtend a2]
+                              (False, False) -> [toBitBlock m]
+toBitBlocks m@(BIS a1 a2) = case (extends a1, extends a2) of
+                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
+                              (True, False)  -> [toBitBlock m, toExtend a1]
+                              (False, True)  -> [toBitBlock m, toExtend a2]
+                              (False, False) -> [toBitBlock m]
+toBitBlocks m@(INC a) = case extends a of
+                              True   -> [toBitBlock m, toExtend a]
+                              False  -> [toBitBlock m]
+toBitBlocks m@(DEC a) = case extends a of
+                              True   -> [toBitBlock m, toExtend a]
+                              False  -> [toBitBlock m]

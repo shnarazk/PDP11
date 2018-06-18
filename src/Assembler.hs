@@ -9,7 +9,7 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.5.0"
+version = "0.6.0"
 
 assemble :: String -> Either String [ASM]
 assemble str = case parse readASMs "ERROR" str of
@@ -26,6 +26,10 @@ readASMs = many1 (spaces *> commands <* newline) <* eof
                       , asmSUB
 --                      , asmMUL
                       , asmCLR
+                      , asmBIC
+                      , asmBIS
+                      , asmINC
+                      , asmDEC
                       ]
 --               <?> "MOV, ADD, SUB, MUL, or CLR."
 
@@ -103,6 +107,18 @@ asmSUB = uncurry ADD <$> (try (string "SUB ") *> twoAddrs)
 
 asmCLR :: Parsec String () ASM
 asmCLR = CLR <$> (try (string "CLR ") *> oneAddr)
+
+asmBIC :: Parsec String () ASM
+asmBIC = uncurry BIC <$> (try (string "BIC ") *> twoAddrs)
+
+asmBIS :: Parsec String () ASM
+asmBIS = uncurry BIS <$> (try (string "BIS ") *> twoAddrs)
+
+asmINC :: Parsec String () ASM
+asmINC = INC <$> (try (string "INC ") *> oneAddr)
+
+asmDEC :: Parsec String () ASM
+asmDEC =  DEC <$> (try (string "DEC ") *> oneAddr)
 
 integer :: Parsec String () Int
 integer = read <$> many1 digit
