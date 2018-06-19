@@ -6,6 +6,12 @@ author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
+flags:
+  bot:
+    description:     Build Discord bot
+    manual:          true
+    default:         false
+
 extra-source-files:
 - README.md
 - ChangeLog.md
@@ -42,6 +48,12 @@ executables:
   PDP11-bot:
     source-dirs:         discord
     main:                PDP11-bot.hs
+    when:
+      - condition:   flag(bot)
+        then:
+          buildable: true
+        else:
+          buildable: false
     dependencies:
       - PDP11
       - base==4.*
