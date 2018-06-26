@@ -25,7 +25,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.9.0"
+version = "0.10.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -112,7 +112,7 @@ infixr 9 !..
 
 -- updater of byte array index for an Int
 (<..) :: Int -> Int -> (MemBlock -> MemBlock)
-i <.. x = (// [(i, div x 256), (i + 1, mod x 256)])
+i <.. x = (// [(i, mod x 256), (i + 1, div x 256)])
 infixl 9 <..
 
 -- updater of Int array index for an Int
