@@ -2,6 +2,7 @@ module PDP11
     (
       version
     , Machine(..)
+    , dump
     , Locator(..)
     , RegId(..)
     , AddrMode(..)
@@ -17,7 +18,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.5.0"
+version = "0.5.1"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -64,6 +65,8 @@ data Machine
 instance Show Machine where
   -- show (Machine m r) = "M:" ++ show (elems m) ++ ", R:" ++ show (elems r)
   show (Machine m r) = "M(rev):" ++ show (reverse (elems m)) ++ ", R(rev):" ++ show (reverse (elems r))
+dump :: Machine -> ([Int], [Int])
+dump (Machine m r) = (elems m, elems r)
 
 data Locator
   = AtRegister Int
