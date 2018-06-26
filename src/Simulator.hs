@@ -50,7 +50,7 @@ makePDP11 b1 b2 = makePDP11' (length b1, length b2) b1 b2
 initialMachine :: Machine -- memory is at left; register is at right.
 initialMachine = makePDP11'
   (16,8)
-  [2, 0, 4, 0, 8, 0, 0, 1, 1, 1, 10, 0] -- a sequence of (lower 8 bits, upper 8 bits)
+  [2, 0, 4, 0, 8, 0, 0, 1, 1, 1, 200, 0] -- a sequence of (lower 8 bits, upper 8 bits)
   [0, 2, 0, 4, 0, 6, 1, 16]
 
 runSimulator :: Machine -> [ASM] -> [Machine]
