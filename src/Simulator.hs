@@ -110,7 +110,7 @@ code (DEC s)   = do (p, x) <- fetchI s
 
 -- successive memory access
 (!..) :: MemBlock -> Int -> Int
-v !.. i = (v ! i) * 256 + (v ! (i + 1))
+v !.. i = (v ! (i + 1)) * 256 + (v ! i)
 infixr 9 !..
 
 -- updater of byte array index for an Int
