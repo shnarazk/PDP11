@@ -127,9 +127,14 @@ instance Num BitBlock where
       val = min (shiftL (value b1) (from b1) .|. shiftL (value b2) (from b2)) (shiftL 1 to' - 1)
       from' = min (from b1) (from b2)
       to'   = max (to b1) (to b2)
+  (*) =         error "not implemented"
+  abs =         error "not implemented"
+  signum =      error "not implemented"
+  fromInteger = error "not implemented"
+  negate =      error "not implemented"
 
-instance Bits BitBlock where
-  a .|. b = a + b
+(.||.) :: BitBlock -> BitBlock -> BitBlock
+(.||.)  a b = a + b
 
 (.+.) :: Int -> Int -> Int
 x .+. y = x * 2 + y
@@ -147,35 +152,35 @@ shiftBitBlock (BitBlock b f t) i = BitBlock b (f + i) (t + i)
 -- toBitBlock width n = BitBlock n width 0
 
 fromAddrMode :: AddrMode -> BitBlock
-fromAddrMode (Register (Reg r)) = (fromList [0,0,0] .<. 3) .|. (fromInt 3 r .<. 0)
-fromAddrMode (Immediate i)      = (fromList [0,0,1] .<. 3) .|. (fromInt 3 7 .<. 0) -- FIXME
-fromAddrMode (Index i (Reg r))  = (fromList [1,1,0] .<. 3) .|. (fromInt 3 r .<. 0) -- FIXME
-fromAddrMode (AutoInc (Reg r))  = (fromList [0,1,0] .<. 3) .|. (fromInt 3 r .<. 0)
-fromAddrMode (AutoDec (Reg r))  = (fromList [1,0,0] .<. 3) .|. (fromInt 3 r .<. 0)
-fromAddrMode (Indirect a )      = (fromList [0,0,1] .<. 3) .|. (fromAddrMode a)
+fromAddrMode (Register (Reg r)) = (fromList [0,0,0] .<. 3) .||. (fromInt 3 r .<. 0)
+fromAddrMode (Immediate i)      = (fromList [0,0,1] .<. 3) .||. (fromInt 3 7 .<. 0) -- FIXME
+fromAddrMode (Index i (Reg r))  = (fromList [1,1,0] .<. 3) .||. (fromInt 3 r .<. 0) -- FIXME
+fromAddrMode (AutoInc (Reg r))  = (fromList [0,1,0] .<. 3) .||. (fromInt 3 r .<. 0)
+fromAddrMode (AutoDec (Reg r))  = (fromList [1,0,0] .<. 3) .||. (fromInt 3 r .<. 0)
+fromAddrMode (Indirect a )      = (fromList [0,0,1] .<. 3) .||. (fromAddrMode a)
 
 toBitBlock :: ASM -> BitBlock
 toBitBlock (CLR a1)    = (fromList [0,0,0,0, 1,0,1,0, 0,0] .<. 6)
-                         .|. (fromAddrMode a1 .<. 0)
+                         .||. (fromAddrMode a1 .<. 0)
 toBitBlock (MOV a1 a2) = (fromList [0,0,0,1] .<. 12)
-                         .|. (fromAddrMode a1 .<. 6)
-                         .|. (fromAddrMode a2 .<. 0)
+                         .||. (fromAddrMode a1 .<. 6)
+                         .||. (fromAddrMode a2 .<. 0)
 toBitBlock (SUB a1 a2) = (fromList [0,1,1,0] .<. 12)
-                         .|. (fromAddrMode a1 .<. 6)
-                         .|. (fromAddrMode a2 .<. 0)
+                         .||. (fromAddrMode a1 .<. 6)
+                         .||. (fromAddrMode a2 .<. 0)
 toBitBlock (ADD a1 a2) = (fromList [1,1,1,0] .<. 12)
-                         .|. (fromAddrMode a1 .<. 6)
-                         .|. (fromAddrMode a2 .<. 0)
+                         .||. (fromAddrMode a1 .<. 6)
+                         .||. (fromAddrMode a2 .<. 0)
 toBitBlock (BIC a1 a2) = (fromList [0,1,0,0] .<. 12)
-                         .|. (fromAddrMode a1 .<. 6)
-                         .|. (fromAddrMode a2 .<. 0)
+                         .||. (fromAddrMode a1 .<. 6)
+                         .||. (fromAddrMode a2 .<. 0)
 toBitBlock (BIS a1 a2) = (fromList [0,1,0,1] .<. 12)
-                         .|. (fromAddrMode a1 .<. 6)
-                         .|. (fromAddrMode a2 .<. 0)
+                         .||. (fromAddrMode a1 .<. 6)
+                         .||. (fromAddrMode a2 .<. 0)
 toBitBlock (INC a1)    = (fromList [0,0,0,0,1,0,1,0,1,0] .<. 6)
-                         .|. (fromAddrMode a1 .<. 0)
+                         .||. (fromAddrMode a1 .<. 0)
 toBitBlock (DEC a1)    = (fromList [0,0,0,0,1,0,1,0,1,1] .<. 6)
-                         .|. (fromAddrMode a1 .<. 0)
+                         .||. (fromAddrMode a1 .<. 0)
 
 -- fromASM :: ASM -> String
 -- fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
