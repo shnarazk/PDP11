@@ -17,7 +17,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.4.0"
+version = "0.5.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
