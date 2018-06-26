@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: aa605a9181a3f56bfdde3ec3a417d09b059595d210edd65518a4d582a2ceb823
+-- hash: ea535af916a61fda6ca996dae15f9bf6a6ac0ab2d338e6cb116571dd1582a97d
 
 name:           PDP11
 version:        0.1.0.0
@@ -23,6 +23,11 @@ extra-source-files:
 source-repository head
   type: git
   location: https://github.com/githubuser/PDP11
+
+flag bot
+  description: Build Discord bot
+  manual: True
+  default: False
 
 library
   exposed-modules:
@@ -58,6 +63,10 @@ executable PDP11-bot
     , parsec >=3.1
     , req
     , text ==1.2.*
+  if flag(bot)
+    buildable: True
+  else
+    buildable: False
   default-language: Haskell2010
 
 executable PDP11-exe

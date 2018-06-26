@@ -25,7 +25,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.8.0"
+version = "0.8.1"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -50,7 +50,7 @@ makePDP11 b1 b2 = makePDP11' (length b1, length b2) b1 b2
 initialMachine :: Machine -- memory is at left; register is at right.
 initialMachine = makePDP11'
   (16,8)
-  [0, 2, 0, 4, 0, 8, 1, 255, 0, 8, 0, 10]
+  [2, 0, 4, 0, 8, 0, 1, 1, 8, 8, 10, 0] -- a sequence of (lower 8 bits, upper 8 bits)
   [0, 2, 0, 4, 0, 6, 1, 16]
 
 runSimulator :: Machine -> [ASM] -> [Machine]

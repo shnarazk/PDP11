@@ -126,8 +126,6 @@ instance Show BitBlock where
         | otherwise    = (n + 1, a : b')
         where
           (n, b') = insertP b
-    
-
 
 instance Num BitBlock where
   b1 + b2 = BitBlock (shiftR val from')
