@@ -1,4 +1,5 @@
 discord/DiscordSecret.hs
+PDP11.cabal
 dist
 dist-*
 cabal-dev

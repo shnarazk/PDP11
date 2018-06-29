@@ -1,0 +1,18 @@
+cache:
+  paths:
+    - .stack-work
+
+build:
+  stage: build
+  script:
+    - stack build
+
+test:
+  stage: test
+  script:
+    - stack test
+
+haddock:
+  stage: test
+  script:
+    - stack haddock --fast
