@@ -1,0 +1,6 @@
+resolver: nightly-2018-06-26
+compiler: ghc-8.4.3
+allow-newer: true
+nix:
+  enable: true
+  packages: [ zlib ]

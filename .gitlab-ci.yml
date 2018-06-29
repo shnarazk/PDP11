@@ -1,10 +1,12 @@
 cache:
   paths:
+    - stack.yaml
     - .stack-work
 
 build:
   stage: build
   script:
+    - cp .gitlab-stack.yaml stack.yaml
     - stack build
 
 test:
