@@ -28,5 +28,5 @@ CLR @(R1)+                      0000_1010_0001_1001
 - [x] Lens -- use concise accessors
 - [x] Hspec -- automatic test
 - [x] Discord-hs -- make a bot
-- [ ] Servant -- run as a web server
+- [x] Servant -- run as a web server
 - [X] Bits -- Everything should be a bit stream
