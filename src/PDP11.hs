@@ -2,6 +2,7 @@ module PDP11
     (
       version
     , Machine(..)
+    , _pc
     , dump
     , Locator(..)
     , RegId(..)
@@ -68,13 +69,16 @@ instance Show Machine where
 dump :: Machine -> ([Int], [Int])
 dump (Machine m r) = (elems m, elems r)
 
+_pc :: Machine -> Int
+_pc (Machine _ r) = r ! 7
+
 data Locator
   = AtRegister Int
   | AtMemory Int
   | AsLiteral Int
 
 data RegId = Reg Int
-  deriving (Eq, Ord, Read, Show)  
+  deriving (Eq, Ord, Read, Show)
 
 data AddrMode
   = Register RegId              -- Register
@@ -84,7 +88,15 @@ data AddrMode
   | AutoDec RegId               -- Autodecrement
   | Indirect AddrMode           -- ... Deffered
 --  | PCrelat Int
-  deriving (Eq, Ord, Read, Show)  
+  deriving (Eq, Ord, Read)
+
+instance Show AddrMode where
+  show (Register (Reg n)) = 'R' : show n
+  show (Immediate n)      = '#' : show n
+  show (Index n (Reg r))  = show n ++ "(R" ++ show r ++ ")"
+  show (AutoInc (Reg r))  = "(R" ++ show r ++ ")+"
+  show (AutoDec (Reg r))  = "-(R" ++ show r ++ ")"
+  show (Indirect x)       = '@' : show x
 
 data ASM
   = MOV AddrMode AddrMode
@@ -96,7 +108,21 @@ data ASM
   | DEC AddrMode
 --  | MUL AddrMode AddrMode
   | CLR AddrMode
-  deriving (Eq, Ord, Read, Show)
+  | JMP Int
+  | BNE Int
+  deriving (Eq, Ord, Read)
+
+instance Show ASM where
+  show (MOV a b) = "MOV " ++ show a ++ ", " ++ show b
+  show (ADD a b) = "ADD " ++ show a ++ ", " ++ show b
+  show (SUB a b) = "SUB " ++ show a ++ ", " ++ show b
+  show (BIC a b) = "BIC " ++ show a ++ ", " ++ show b
+  show (BIS a b) = "BIS " ++ show a ++ ", " ++ show b
+  show (INC a)   = "INC " ++ show a
+  show (DEC a)   = "DEC " ++ show a
+  show (CLR a)   = "CLR " ++ show a
+  show (JMP a)   = "JMP " ++ show a
+  show (BNE a)   = "BNE " ++ show a
 
 data BitBlock
   = BitBlock
@@ -184,6 +210,10 @@ toBitBlock (INC a1)    = (fromList [0,0,0,0,1,0,1,0,1,0] .<. 6)
                          .||. (fromAddrMode a1 .<. 0)
 toBitBlock (DEC a1)    = (fromList [0,0,0,0,1,0,1,0,1,1] .<. 6)
                          .||. (fromAddrMode a1 .<. 0)
+toBitBlock (JMP ofs)    = (fromList [0,0,0,0,0 ,1,0,0] .<. 8)
+                         .||. fromInt 8 (if ofs < 0 then 256 + ofs else mod ofs 128)
+toBitBlock (BNE ofs)    = (fromList [0,0,0,0,0 ,1,0,0] .<. 8)
+                         .||. fromInt 8 (if ofs < 0 then 256 + ofs else mod ofs 128)
 
 -- fromASM :: ASM -> String
 -- fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
@@ -234,3 +264,5 @@ toBitBlocks m@(INC a) = case extends a of
 toBitBlocks m@(DEC a) = case extends a of
                               True   -> [toBitBlock m, toExtend a]
                               False  -> [toBitBlock m]
+toBitBlocks m@(JMP _) = [toBitBlock m]
+toBitBlocks m@(BNE _) = [toBitBlock m]

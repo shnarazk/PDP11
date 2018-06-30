@@ -14,13 +14,14 @@ module Simulator
     , runPDP11
     , initialMachine
     , runSimulator
-    , runSimulator'
     ) where
 
 import Control.Lens hiding ((<.))
 import Control.Monad.State
 import Data.Array
 import Data.Bits
+import Data.List
+import Data.Maybe
 import PDP11 hiding (version)
 import Assembler (assemble)
 
@@ -35,9 +36,13 @@ version = "0.10.0"
 makeLenses ''Machine
 
 type MemBlock = Array Int Int
+type CodeMap = [(Int, ASM)]
 
 newtype PDPState a = PDPState (State Machine a)
   deriving (Functor, Applicative, Monad, MonadState Machine)
+
+codemap :: Int -> [ASM] -> CodeMap
+codemap addr l = zip (scanl (\a c -> a + (2 * length (toBitBlocks c))) addr l) l
 
 makePDP11' :: (Int, Int) -> [Int] -> [Int] -> Machine
 makePDP11' (m, r) b1 b2 = Machine (chunk m b1) (chunk r b2)
@@ -50,23 +55,26 @@ makePDP11 b1 b2 = makePDP11' (length b1, length b2) b1 b2
 initialMachine :: Machine -- memory is at left; register is at right.
 initialMachine = makePDP11 [2, 0, 4, 0, 8, 0, 0, 1, 1, 1, 0, 0] [0, 2, 0, 4, 0, 6, 1, 200]
 
-runSimulator :: Machine -> [ASM] -> [Machine]
-runSimulator m l = scanl runI m l
-  where runI :: Machine -> ASM -> Machine
-        runI m a = execState execute m
-          where (PDPState execute) = do incrementPC; code a
-
-runSimulator' :: [ASM] -> [Machine]
-runSimulator' l = runSimulator initialMachine l
+runSimulator :: Machine -> CodeMap -> [Machine]
+runSimulator m is = take 16 $ runI m
+  where runI :: Machine -> [Machine]
+        runI m
+          | Just a <- lookup (_pc m) is =
+              let m' = execState execute m
+                  (PDPState execute) = do incrementPC; code a
+              in m : runI m'
+          | otherwise = [] -- error $ show ((_register m ! 7), is)
 
 runPDP11 :: String -> Maybe String
 runPDP11 str@(assemble -> result) =
   case result of
-    Right program -> Just . unlines $ zipWith (++) instrs states
-      where instrs = "#0 Initial state\n" : zipWith3 combine [1 :: Int .. ] mnems program
-            combine n a b = "#" ++ show n ++ " " ++ a ++ "\t; " ++ show b ++ "\n"
-            mnems = map (dropWhile (`elem` " \t")) $ lines str
-            states = map show $ runSimulator' program
+    Right program -> Just . unlines $ zipWith (++) instrs (map show states) ++ [show (intAddrs,codemap 200 program)]
+      where instrs = "#0\tInitial state\n" : zipWith3 combine [1 :: Int .. ] intAddrs instrs'
+            combine n a b = "#" ++ show n ++ "\t" ++ show b ++ "\t@ " ++ show a ++ "\n"
+            codes = codemap (_pc initialMachine) program
+            states = runSimulator initialMachine codes
+            intAddrs = map _pc states
+            instrs' = map (fromJust . flip lookup codes) intAddrs
     Left message  -> Just message
 
 code :: ASM -> PDPState ()
@@ -102,6 +110,12 @@ code (INC s)   = do (p, x) <- fetchI s
 
 code (DEC s)   = do (p, x) <- fetchI s
                     storeI p (x - 1)
+
+code (JMP o)   = do (p, x) <- fetchI (Register (Reg 7))
+                    storeI p (x + o)
+
+code (BNE o)   = do (p, x) <- fetchI (Register (Reg 7))
+                    when (False) $ storeI p (x + o)  -- FIXME
 
 --------------------------------------------------------------------------------
 

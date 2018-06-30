@@ -30,6 +30,8 @@ readASMs = many1 (spaces *> commands <* newline) <* eof
                       , asmBIS
                       , asmINC
                       , asmDEC
+                      , asmJMP
+                      , asmBNE
                       ]
 --               <?> "MOV, ADD, SUB, MUL, or CLR."
 
@@ -120,8 +122,20 @@ asmINC = INC <$> (try (string "INC ") *> oneAddr)
 asmDEC :: Parsec String () ASM
 asmDEC =  DEC <$> (try (string "DEC ") *> oneAddr)
 
+asmJMP :: Parsec String () ASM
+asmJMP = JMP <$> (try (string "JMP ") *> pminteger)
+
+asmBNE :: Parsec String () ASM
+asmBNE = JMP <$> (try (string "BNE ") *> pminteger)
+
 integer :: Parsec String () Int
 integer = read <$> many1 digit
+
+ninteger :: Parsec String () Int
+ninteger = char '-' *> (negate <$> integer)
+
+pminteger :: Parsec String () Int
+pminteger = choice [ninteger, integer]
 
 line :: Parsec String () ASM
 line = do
