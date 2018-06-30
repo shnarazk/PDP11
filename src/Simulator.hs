@@ -14,6 +14,7 @@ module Simulator
     , runPDP11
     , initialMachine
     , runSimulator
+    , runSimulator'
     ) where
 
 import Control.Lens hiding ((<.))
@@ -61,32 +62,38 @@ runSimulator m is = take 16 $ runI m
         runI m
           | Just a <- lookup (_pc m) is =
               let m' = execState execute m
-                  (PDPState execute) = do incrementPC; code a
-              in m : runI m'
+                  (PDPState execute) = code a
+              in m' : runI m'
           | otherwise = [] -- error $ show ((_register m ! 7), is)
+
+runSimulator' :: [ASM] -> [Machine]
+runSimulator' asm = runSimulator initialMachine (codemap (_pc initialMachine) asm)
 
 runPDP11 :: String -> Maybe String
 runPDP11 str@(assemble -> result) =
   case result of
-    Right program -> Just . unlines $ zipWith (++) instrs (map show states) ++ [show (intAddrs,codemap 200 program)]
+    Right program -> Just . unlines $ zipWith (++) instrs (map show states)
       where instrs = "#0\tInitial state\n" : zipWith3 combine [1 :: Int .. ] intAddrs instrs'
             combine n a b = "#" ++ show n ++ "\t" ++ show b ++ "\t@ " ++ show a ++ "\n"
             codes = codemap (_pc initialMachine) program
-            states = runSimulator initialMachine codes
+            states = initialMachine : runSimulator initialMachine codes
             intAddrs = map _pc states
             instrs' = map (fromJust . flip lookup codes) intAddrs
     Left message  -> Just message
 
 code :: ASM -> PDPState ()
-code (MOV s d) = do (_, x) <- fetchI s
+code (MOV s d) = do incrementPC
+                    (_, x) <- fetchI s
                     (p, _) <- fetchI d
                     storeI p x
 
-code (ADD s d) = do (_, x) <- fetchI s
+code (ADD s d) = do incrementPC
+                    (_, x) <- fetchI s
                     (p, y) <- fetchI d
                     storeI p (y + x)
 
-code (SUB s d) = do (_, x) <- fetchI s
+code (SUB s d) = do incrementPC
+                    (_, x) <- fetchI s
                     (p, y) <- fetchI d
                     storeI p (y - x)
 
@@ -94,27 +101,34 @@ code (SUB s d) = do (_, x) <- fetchI s
 --                     (p, y) <- fetchI d
 --                     storeI p (y * x)
 
-code (CLR d)   = do (p, _) <- fetchI d
+code (CLR d)   = do incrementPC
+                    (p, _) <- fetchI d
                     storeI p 0
 
-code (BIC s d) = do (_, x) <- fetchI s
+code (BIC s d) = do incrementPC
+                    (_, x) <- fetchI s
                     (p, y) <- fetchI d
                     storeI p (y .&. x)
 
-code (BIS s d) = do (_, x) <- fetchI s
+code (BIS s d) = do incrementPC
+                    (_, x) <- fetchI s
                     (p, y) <- fetchI d
                     storeI p (y .|. x)
 
-code (INC s)   = do (p, x) <- fetchI s
+code (INC s)   = do incrementPC
+                    (p, x) <- fetchI s
                     storeI p (x + 1)
 
-code (DEC s)   = do (p, x) <- fetchI s
+code (DEC s)   = do incrementPC
+                    (p, x) <- fetchI s
                     storeI p (x - 1)
 
-code (JMP o)   = do (p, x) <- fetchI (Register (Reg 7))
+code (JMP o)   = do incrementPC
+                    (p, x) <- fetchI (Register (Reg 7))
                     storeI p (x + o)
 
-code (BNE o)   = do (p, x) <- fetchI (Register (Reg 7))
+code (BNE o)   = do incrementPC
+                    (p, x) <- fetchI (Register (Reg 7))
                     when (False) $ storeI p (x + o)  -- FIXME
 
 --------------------------------------------------------------------------------
