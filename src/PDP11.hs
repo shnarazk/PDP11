@@ -5,7 +5,7 @@ module PDP11
     , initialMachine
     , resetPSW
     , setTrace
-    -- Plumbing
+    -- * Plumbing
     , MemBlock
     , PSW()
     , Machine(..)
@@ -17,18 +17,13 @@ module PDP11
     , ASM(..)
     , toBitBlocks
     , asInts
---    , (.+.)
---    , fromInt
---    , fromList
---    , fromAddrMode
-    , BitBlock(..)
     ) where
 
 import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.6.0"
+version = "0.6.1"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/

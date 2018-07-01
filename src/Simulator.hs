@@ -14,8 +14,6 @@ module Simulator
     , runPDP11
     , runSimulator
     , runSimulator'
-    -- * for debug in ghci
-    , psw, sN, sZ, sV, sC
     ) where
 
 import Control.Lens hiding ((<.))
@@ -28,7 +26,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.11.0"
+version = "0.11.1"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
