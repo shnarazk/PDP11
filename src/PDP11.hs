@@ -1,6 +1,11 @@
 module PDP11
     (
       version
+    , makePDP11
+    , initialMachine
+    -- Plumbing
+    , MemBlock
+    , PSW()
     , Machine(..)
     , _pc
     , dump
@@ -52,25 +57,48 @@ A or X(PC)   Relative                      Offset address X = (PC)
                                            PC += 2
                                            Data = ((PC + X)) = ((A))
 -}
+type MemBlock = Array Int Int
+
+data PSW = PSW { _sN :: Bool
+               , _sZ :: Bool
+               , _sV :: Bool
+               , _sC :: Bool
+               }
+  deriving (Eq, Ord, Read)
+
+instance Show PSW where
+  show (PSW a b c d) = show $ map fromEnum [a, b, c, d]
 
 data Machine
   = Machine
     {
       _memory   :: Array Int Int
     , _register :: Array Int Int
---  , _psw      :: [Bool]
+    , _psw      :: PSW
 --  , _insts    :: [ASM]
     }
   deriving (Eq, Ord, Read)
 
 instance Show Machine where
   -- show (Machine m r) = "M:" ++ show (elems m) ++ ", R:" ++ show (elems r)
-  show (Machine m r) = "M(rev):" ++ show (reverse (elems m)) ++ ", R(rev):" ++ show (reverse (elems r))
+  show (Machine m r p) = "M(rev):" ++ show (reverse (elems m))
+    ++ ", R(rev):" ++ show (reverse (elems r))
+    ++ ", PSW:" ++ show p
 dump :: Machine -> ([Int], [Int])
-dump (Machine m r) = (elems m, elems r)
+dump (Machine m r _) = (elems m, elems r)
 
+makePDP11 :: [Int] -> [Int] -> Machine
+makePDP11 b1 b2 = Machine (chunk b1) (chunk b2) (PSW False False False False)
+  where chunk :: [Int] -> MemBlock
+        chunk l = listArray (0, n - 1) (take n (l ++ repeat 0))
+          where n = length l
+
+initialMachine :: Machine -- memory is at left; register is at right.
+initialMachine = makePDP11 [2, 0, 4, 0, 8, 0, 0, 1, 1, 1, 0, 0] [0, 2, 0, 4, 0, 6, 1, 200]
+
+-- misc accessors
 _pc :: Machine -> Int
-_pc (Machine _ r) = r ! 7
+_pc (Machine _ r _) = r ! 7
 
 data Locator
   = AtRegister Int

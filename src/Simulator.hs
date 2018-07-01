@@ -8,13 +8,14 @@
 module Simulator
     (
       version
+    , PSW(..)
     , Machine(..)
-    , makePDP11
     , makePDP11'
     , runPDP11
-    , initialMachine
     , runSimulator
     , runSimulator'
+    -- * for debug in ghci
+    , psw, sN, sZ, sV, sC
     ) where
 
 import Control.Lens hiding ((<.))
@@ -36,7 +37,13 @@ version = "0.10.0"
 -- Note: (register %~ (// ...)) :: Machine -> Machine
 makeLenses ''Machine
 
-type MemBlock = Array Int Int
+-- pdp .^ (psw . s[NZVC])               to access N, Zero, V, Clear
+-- pdp & (psw . s[NZVC]) .~ True        to set N, Z, V, C
+makeLenses ''PSW
+
+updatePSW :: ((PSW -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> Machine -> Machine
+updatePSW acs val m = m & (psw . acs) .~ val
+
 type CodeMap = [(Int, ASM)]
 
 newtype PDPState a = PDPState (State Machine a)
@@ -45,16 +52,8 @@ newtype PDPState a = PDPState (State Machine a)
 codemap :: Int -> [ASM] -> CodeMap
 codemap addr l = zip (scanl (\a c -> a + (2 * length (toBitBlocks c))) addr l) l
 
-makePDP11' :: (Int, Int) -> [Int] -> [Int] -> Machine
-makePDP11' (m, r) b1 b2 = Machine (chunk m b1) (chunk r b2)
-  where chunk :: Int -> [Int] -> MemBlock
-        chunk n l = listArray (0, n-1) (take n (l ++ repeat 0))
-
-makePDP11 :: [Int] -> [Int] -> Machine
-makePDP11 b1 b2 = makePDP11' (length b1, length b2) b1 b2
-
-initialMachine :: Machine -- memory is at left; register is at right.
-initialMachine = makePDP11 [2, 0, 4, 0, 8, 0, 0, 1, 1, 1, 0, 0] [0, 2, 0, 4, 0, 6, 1, 200]
+makePDP11' :: Int -> [Int] -> [Int] -> Machine
+makePDP11' n b1 b2 = makePDP11 (take n (b1 ++ repeat 0)) (take 8 (b2 ++ repeat 0))
 
 runSimulator :: Machine -> CodeMap -> [Machine]
 runSimulator m is = take 16 $ runI m
@@ -153,6 +152,9 @@ accessI block = (^. block) <$> get
 
 updateI :: ASetter Machine Machine MemBlock MemBlock -> (MemBlock -> MemBlock) -> PDPState ()
 updateI block updates = do s <- get; put $ s & block %~ updates
+
+pswI :: ((Bool -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> PDPState ()
+pswI acs val = do s <- get; put $ s & (psw . acs) .~ val
 
 incrementPC :: PDPState ()
 incrementPC = do reg <- accessI register
