@@ -68,7 +68,7 @@ runSimulator m is = take 256 $ runI (injectCode m is)
   where runI :: Machine -> [Machine]
         runI m
           | Just a <- lookup (_pc m) is =
-              let m' = execState execute m
+              let m' = execState execute $ setTrace ((_pc m), a) m
                   (PDPState execute) = code a
               in m' : runI m'
           | otherwise = [] -- error $ show ((_register m ! 7), is)
@@ -84,8 +84,10 @@ runPDP11 str@(assemble -> result) =
             combine n a b = "#" ++ show n ++ "\t" ++ show b ++ "\t@ " ++ show a ++ "\n"
             codes = codemap (_pc initialMachine) program
             states = initialMachine : runSimulator initialMachine codes
-            intAddrs = map _pc states
-            instrs' = map (fromJust . flip lookup codes) intAddrs
+            intAddrs = map (^. (trace . _1)) states
+            instrs' = map (^. (trace . _2)) states
+            _intAddrs = map _pc states
+            _instrs' = map (fromJust . flip lookup codes) intAddrs
     Left message  -> Just message
 
 code :: ASM -> PDPState ()
