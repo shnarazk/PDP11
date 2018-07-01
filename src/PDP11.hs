@@ -177,7 +177,7 @@ instance Show ASM where
   show (BR a)    = "BR "  ++ show a
   show (BNE a)   = "BNE " ++ show a
   show (BEQ a)   = "BEQ " ++ show a
-  show NOP       = "NOP"
+  show NOP       = " --- "
 
 -- >> BitBlock 1 0 1 = 1
 -- >> BitBlock 10 1 2 = 10 * 2 = 20

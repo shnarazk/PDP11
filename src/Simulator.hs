@@ -71,7 +71,7 @@ runSimulator m is = take 256 $ runI (injectCode m is)
               let m' = execState execute $ setTrace ((_pc m), a) m
                   (PDPState execute) = code a
               in m' : runI m'
-          | otherwise = [] -- error $ show ((_register m ! 7), is)
+          | otherwise = []
 
 runSimulator' :: [ASM] -> [Machine]
 runSimulator' asm = runSimulator initialMachine (codemap (_pc initialMachine) asm)
@@ -80,14 +80,9 @@ runPDP11 :: String -> Maybe String
 runPDP11 str@(assemble -> result) =
   case result of
     Right program -> Just . unlines $ zipWith (++) instrs (map show states)
-      where instrs = "#0\tInitial state\n" : zipWith3 combine [1 :: Int .. ] intAddrs instrs'
-            combine n a b = "#" ++ show n ++ "\t" ++ show b ++ "\t@ " ++ show a ++ "\n"
-            codes = codemap (_pc initialMachine) program
-            states = initialMachine : runSimulator initialMachine codes
-            intAddrs = map (^. (trace . _1)) states
-            instrs' = map (^. (trace . _2)) states
-            _intAddrs = map _pc states
-            _instrs' = map (fromJust . flip lookup codes) intAddrs
+      where instrs = "#0\tInitial state\n" : zipWith combine [1 :: Int .. ] (map (^. trace) states)
+            combine n (a, c) = "#" ++ show n ++ "\t" ++ show c ++ "\t@ " ++ show a ++ "\n"
+            states = initialMachine : runSimulator initialMachine (codemap (_pc initialMachine) program)
     Left message  -> Just message
 
 code :: ASM -> PDPState ()
