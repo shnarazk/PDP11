@@ -26,12 +26,17 @@ readASMs = many1 (spaces *> commands <* newline) <* eof
                       , asmSUB
 --                      , asmMUL
                       , asmCLR
+                      , asmASL
+                      , asmASR
+                      , asmBIT
                       , asmBIC
                       , asmBIS
                       , asmINC
                       , asmDEC
                       , asmJMP
+                      , asmBR
                       , asmBNE
+                      , asmBEQ
                       ]
 --               <?> "MOV, ADD, SUB, MUL, or CLR."
 
@@ -110,6 +115,15 @@ asmSUB = uncurry ADD <$> (try (string "SUB ") *> twoAddrs)
 asmCLR :: Parsec String () ASM
 asmCLR = CLR <$> (try (string "CLR ") *> oneAddr)
 
+asmASL :: Parsec String () ASM
+asmASL = ASL <$> (try (string "ASL ") *> oneAddr)
+
+asmASR :: Parsec String () ASM
+asmASR = ASR <$> (try (string "ASR ") *> oneAddr)
+
+asmBIT :: Parsec String () ASM
+asmBIT = uncurry BIT <$> (try (string "BIT ") *> twoAddrs)
+
 asmBIC :: Parsec String () ASM
 asmBIC = uncurry BIC <$> (try (string "BIC ") *> twoAddrs)
 
@@ -123,10 +137,16 @@ asmDEC :: Parsec String () ASM
 asmDEC =  DEC <$> (try (string "DEC ") *> oneAddr)
 
 asmJMP :: Parsec String () ASM
-asmJMP = JMP <$> (try (string "JMP ") *> pminteger)
+asmJMP = JMP <$> (try (string "JMP ") *> oneAddr)
+
+asmBR :: Parsec String () ASM
+asmBR = BR <$> (try (string "BR ") *> pminteger)
 
 asmBNE :: Parsec String () ASM
-asmBNE = JMP <$> (try (string "BNE ") *> pminteger)
+asmBNE = BNE <$> (try (string "BNE ") *> pminteger)
+
+asmBEQ :: Parsec String () ASM
+asmBEQ = BEQ <$> (try (string "BEQ ") *> pminteger)
 
 integer :: Parsec String () Int
 integer = read <$> many1 digit

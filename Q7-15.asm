@@ -1,5 +1,1 @@
-	MOV #0, R1
-	CLR @(R1)+
-	CLR @(R1)+
-	CLR @(R1)+
-	JMP -12
+	CLR @#100

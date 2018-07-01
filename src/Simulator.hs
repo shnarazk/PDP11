@@ -41,8 +41,8 @@ makeLenses ''Machine
 -- pdp & (psw . s[NZVC]) .~ True        to set N, Z, V, C
 makeLenses ''PSW
 
-updatePSW :: ((PSW -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> Machine -> Machine
-updatePSW acs val m = m & (psw . acs) .~ val
+-- updatePSW :: ((PSW -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> Machine -> Machine
+-- updatePSW acs val m = m & (psw . acs) .~ val
 
 type CodeMap = [(Int, ASM)]
 
@@ -55,8 +55,16 @@ codemap addr l = zip (scanl (\a c -> a + (2 * length (toBitBlocks c))) addr l) l
 makePDP11' :: Int -> [Int] -> [Int] -> Machine
 makePDP11' n b1 b2 = makePDP11 (take n (b1 ++ repeat 0)) (take 8 (b2 ++ repeat 0))
 
+injectCode :: Machine -> CodeMap -> Machine
+injectCode pdp c = pdp & memory .~ m'
+  where
+    adr = _pc pdp
+    n = length b
+    m' = accumArray (+) 0 (0, adr + n) $ assocs (pdp ^. memory) ++ zip [adr ..] b
+    b = concatMap asInts $ concatMap (toBitBlocks . snd) c
+
 runSimulator :: Machine -> CodeMap -> [Machine]
-runSimulator m is = take 16 $ runI m
+runSimulator m is = take 256 $ runI (injectCode m is)
   where runI :: Machine -> [Machine]
         runI m
           | Just a <- lookup (_pc m) is =
@@ -85,16 +93,26 @@ code (MOV s d) = do incrementPC
                     (_, x) <- fetchI s
                     (p, _) <- fetchI d
                     storeI p x
+                    updatePSW sV False
+                    updatePSW sC False
 
 code (ADD s d) = do incrementPC
                     (_, x) <- fetchI s
                     (p, y) <- fetchI d
-                    storeI p (y + x)
+                    let x' = (y + x)
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
 
 code (SUB s d) = do incrementPC
                     (_, x) <- fetchI s
                     (p, y) <- fetchI d
-                    storeI p (y - x)
+                    let x' = (y - x)
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
 
 -- code (MUL s d) = do (_, x) <- fetchI s
 --                     (p, y) <- fetchI d
@@ -103,32 +121,84 @@ code (SUB s d) = do incrementPC
 code (CLR d)   = do incrementPC
                     (p, _) <- fetchI d
                     storeI p 0
+                    updatePSW sN False
+                    updatePSW sZ True
+                    updatePSW sV False
+                    updatePSW sC False
+
+code (ASL d)   = do incrementPC
+                    (p, x) <- fetchI d
+                    let x' = shiftL x 1
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
+                    updatePSW sC False
+
+code (ASR d)   = do incrementPC
+                    (p, x) <- fetchI d
+                    let x' = shiftR x 1
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
+                    updatePSW sC False
+
+code (BIT s d) = do incrementPC
+                    (_, x) <- fetchI s
+                    (p, y) <- fetchI d
+                    let z = y .&. x
+                    updatePSW sN (z < 0)
+                    updatePSW sZ (z == 0)
+                    updatePSW sV False
 
 code (BIC s d) = do incrementPC
                     (_, x) <- fetchI s
                     (p, y) <- fetchI d
                     storeI p (y .&. x)
+                    updatePSW sZ (y .&. x == 0)
+                    updatePSW sV False
 
 code (BIS s d) = do incrementPC
                     (_, x) <- fetchI s
                     (p, y) <- fetchI d
                     storeI p (y .|. x)
+                    updatePSW sZ (y .&. x == 0)
+                    updatePSW sV False
 
 code (INC s)   = do incrementPC
                     (p, x) <- fetchI s
-                    storeI p (x + 1)
+                    let x' = x + 1
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
 
 code (DEC s)   = do incrementPC
                     (p, x) <- fetchI s
-                    storeI p (x - 1)
+                    let x' = x - 1
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
 
-code (JMP o)   = do incrementPC
+code (JMP s)   = do incrementPC
+                    (p, x) <- fetchI s
+                    storeI p (x)
+
+code (BR o)    = do incrementPC
                     (p, x) <- fetchI (Register (Reg 7))
-                    storeI p (x + o)
+                    storeI p (x + 2 * o)
 
 code (BNE o)   = do incrementPC
                     (p, x) <- fetchI (Register (Reg 7))
-                    when (False) $ storeI p (x + o)  -- FIXME
+                    y <- readPSW sZ
+                    when (not y) $ storeI p (x + 2 * o)
+
+code (BEQ o)   = do incrementPC
+                    (p, x) <- fetchI (Register (Reg 7))
+                    y <- readPSW sZ
+                    when y $ storeI p (x + 2 * o)
 
 --------------------------------------------------------------------------------
 
@@ -153,8 +223,11 @@ accessI block = (^. block) <$> get
 updateI :: ASetter Machine Machine MemBlock MemBlock -> (MemBlock -> MemBlock) -> PDPState ()
 updateI block updates = do s <- get; put $ s & block %~ updates
 
-pswI :: ((Bool -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> PDPState ()
-pswI acs val = do s <- get; put $ s & (psw . acs) .~ val
+readPSW :: ((Bool -> Const Bool Bool) -> PSW -> Const Bool PSW) -> PDPState Bool
+readPSW acs = (^. (psw . acs)) <$> get
+
+updatePSW :: ((Bool -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> PDPState ()
+updatePSW acs val = do s <- get; put $ s & (psw . acs) .~ val
 
 incrementPC :: PDPState ()
 incrementPC = do reg <- accessI register
