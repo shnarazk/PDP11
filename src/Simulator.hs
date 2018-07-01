@@ -14,8 +14,6 @@ module Simulator
     , runPDP11
     , runSimulator
     , runSimulator'
-    -- * for debug in ghci
-    , psw, sN, sZ, sV, sC
     ) where
 
 import Control.Lens hiding ((<.))
@@ -28,7 +26,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.11.0"
+version = "0.11.1"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -68,10 +66,10 @@ runSimulator m is = take 256 $ runI (injectCode m is)
   where runI :: Machine -> [Machine]
         runI m
           | Just a <- lookup (_pc m) is =
-              let m' = execState execute m
+              let m' = execState execute $ setTrace ((_pc m), a) m
                   (PDPState execute) = code a
               in m' : runI m'
-          | otherwise = [] -- error $ show ((_register m ! 7), is)
+          | otherwise = []
 
 runSimulator' :: [ASM] -> [Machine]
 runSimulator' asm = runSimulator initialMachine (codemap (_pc initialMachine) asm)
@@ -80,12 +78,9 @@ runPDP11 :: String -> Maybe String
 runPDP11 str@(assemble -> result) =
   case result of
     Right program -> Just . unlines $ zipWith (++) instrs (map show states)
-      where instrs = "#0\tInitial state\n" : zipWith3 combine [1 :: Int .. ] intAddrs instrs'
-            combine n a b = "#" ++ show n ++ "\t" ++ show b ++ "\t@ " ++ show a ++ "\n"
-            codes = codemap (_pc initialMachine) program
-            states = initialMachine : runSimulator initialMachine codes
-            intAddrs = map _pc states
-            instrs' = map (fromJust . flip lookup codes) intAddrs
+      where instrs = "#0\tInitial state\n" : zipWith combine [1 :: Int .. ] (map (^. trace) states)
+            combine n (a, c) = "#" ++ show n ++ "\t" ++ show c ++ "\t@ " ++ show a ++ "\n"
+            states = initialMachine : runSimulator initialMachine (codemap (_pc initialMachine) program)
     Left message  -> Just message
 
 code :: ASM -> PDPState ()
