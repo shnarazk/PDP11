@@ -9,7 +9,7 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.6.0"
+version = "0.7.0"
 
 assemble :: String -> Either String [ASM]
 assemble str = case parse readASMs "ERROR" str of
