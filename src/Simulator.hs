@@ -62,7 +62,7 @@ injectCode pdp c = pdp & memory .~ m'
     b = concatMap asInts $ concatMap (toBitBlocks . snd) c
 
 runSimulator :: Machine -> CodeMap -> [Machine]
-runSimulator m is = take 256 $ runI (injectCode m is)
+runSimulator m is = take 100 $ runI (injectCode m is)
   where runI :: Machine -> [Machine]
         runI m
           | Just a <- lookup (_pc m) is =
