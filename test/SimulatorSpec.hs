@@ -21,7 +21,7 @@ testRun (target, mem, reg) = do
   (Right code) <- assemble <$> runIO (readFile target)
   let s = makePDP11 mem reg
   describe target $ do
-    it ("ends in " ++ show s) $ setTrace (-1, NOP) (resetPSW (last (runSimulator' code))) `shouldBe` s
+    it ("ends in " ++ show s) $ setTrace (-1, NOP) (resetPSW (last (runSimulator 32 initialMachine code))) `shouldBe` s
 
 spec :: Spec
 spec = mapM_ testRun instances

@@ -7,9 +7,9 @@ import Simulator
 
 main :: IO ()
 main = do str <- getContents
-          case runPDP11 str of
-            Just result -> putStrLn result
-            Nothing -> putStrLn "wrong code"
+          case (fromTrace . runSimulator 32 initialMachine) <$> assemble str of
+            Right result -> putStrLn result
+            Left _ -> putStrLn "wrong code"
           let form l = l' ++ replicate (32 - length l') ' '
                 where l' = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t") $ l
               printer l (i, b) = putStrLn $ form (if i == 0 then l else "") ++ show b
