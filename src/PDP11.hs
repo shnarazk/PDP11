@@ -23,7 +23,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.6.2"
+version = "0.7.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -140,6 +140,7 @@ data ASM
   = MOV AddrMode AddrMode
   | ADD AddrMode AddrMode
   | SUB AddrMode AddrMode
+  | CMP AddrMode AddrMode
   | BIT AddrMode AddrMode
   | BIC AddrMode AddrMode
   | BIS AddrMode AddrMode
@@ -160,6 +161,7 @@ instance Show ASM where
   show (MOV a b) = "MOV " ++ show a ++ ", " ++ show b
   show (ADD a b) = "ADD " ++ show a ++ ", " ++ show b
   show (SUB a b) = "SUB " ++ show a ++ ", " ++ show b
+  show (CMP a b) = "CMP " ++ show a ++ ", " ++ show b
   show (BIT a b) = "BIT " ++ show a ++ ", " ++ show b
   show (BIC a b) = "BIC " ++ show a ++ ", " ++ show b
   show (BIS a b) = "BIS " ++ show a ++ ", " ++ show b
@@ -260,6 +262,9 @@ toBitBlock (SUB a1 a2) = (fromList [0,1,1,0] .<. 12)
 toBitBlock (ADD a1 a2) = (fromList [1,1,1,0] .<. 12)
                          .||. (fromAddrMode a1 .<. 6)
                          .||. (fromAddrMode a2 .<. 0)
+toBitBlock (CMP a1 a2) = (fromList [0,0,1,1] .<. 12)
+                         .||. (fromAddrMode a1 .<. 6)
+                         .||. (fromAddrMode a2 .<. 0)
 toBitBlock (BIT a1 a2) = (fromList [0,0,1,1] .<. 12)
                          .||. (fromAddrMode a1 .<. 6)
                          .||. (fromAddrMode a2 .<. 0)
@@ -317,6 +322,11 @@ toBitBlocks m@(SUB a1 a2) = case (extends a1, extends a2) of
                               (False, True)  -> [toBitBlock m, toExtend a2]
                               (False, False) -> [toBitBlock m]
 toBitBlocks m@(ADD a1 a2) = case (extends a1, extends a2) of
+                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
+                              (True, False)  -> [toBitBlock m, toExtend a1]
+                              (False, True)  -> [toBitBlock m, toExtend a2]
+                              (False, False) -> [toBitBlock m]
+toBitBlocks m@(CMP a1 a2) = case (extends a1, extends a2) of
                               (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
                               (True, False)  -> [toBitBlock m, toExtend a1]
                               (False, True)  -> [toBitBlock m, toExtend a2]

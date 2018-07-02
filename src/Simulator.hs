@@ -26,7 +26,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.11.2"
+version = "0.12.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -138,6 +138,13 @@ code (ASR d)   = do incrementPC
                     updatePSW sZ (x' == 0)
                     updatePSW sV (2 ^ 15 < x')
                     updatePSW sC False
+
+code (CMP s d) = do incrementPC
+                    (_, x) <- fetchI s
+                    (p, y) <- fetchI d
+                    let z = x - y
+                    updatePSW sN (z < 0)
+                    updatePSW sZ (z == 0)
 
 code (BIT s d) = do incrementPC
                     (_, x) <- fetchI s
