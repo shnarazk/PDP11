@@ -342,7 +342,9 @@ toBitBlocks m@(INC a) = case extends a of
 toBitBlocks m@(DEC a) = case extends a of
                               True   -> [toBitBlock m, toExtend a]
                               False  -> [toBitBlock m]
-toBitBlocks m@(JMP _) = [toBitBlock m]
+toBitBlocks m@(JMP a) = case extends a of
+                              True   -> [toBitBlock m, toExtend a]
+                              False  -> [toBitBlock m]
 toBitBlocks m@(BR _)  = [toBitBlock m]
 toBitBlocks m@(BNE _) = [toBitBlock m]
 toBitBlocks m@(BEQ _) = [toBitBlock m]

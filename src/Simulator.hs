@@ -178,8 +178,8 @@ code (DEC s)   = do incrementPC
                     updatePSW sV (2 ^ 15 < x')
 
 code (JMP s)   = do incrementPC
-                    (p, x) <- fetchI s
-                    storeI p (x)
+                    (_, x) <- fetchI s
+                    storeI (AtRegister 7) x
 
 code (BR o)    = do incrementPC
                     (p, x) <- fetchI (Register (Reg 7))
