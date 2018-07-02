@@ -23,7 +23,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.7.0"
+version = "0.7.1"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -262,7 +262,7 @@ toBitBlock (SUB a1 a2) = (fromList [0,1,1,0] .<. 12)
 toBitBlock (ADD a1 a2) = (fromList [1,1,1,0] .<. 12)
                          .||. (fromAddrMode a1 .<. 6)
                          .||. (fromAddrMode a2 .<. 0)
-toBitBlock (CMP a1 a2) = (fromList [0,0,1,1] .<. 12)
+toBitBlock (CMP a1 a2) = (fromList [0,0,1,0] .<. 12)
                          .||. (fromAddrMode a1 .<. 6)
                          .||. (fromAddrMode a2 .<. 0)
 toBitBlock (BIT a1 a2) = (fromList [0,0,1,1] .<. 12)
