@@ -81,7 +81,6 @@ data Machine
   deriving (Eq, Ord, Read)
 
 instance Show Machine where
-  -- show (Machine m r) = "M:" ++ show (elems m) ++ ", R:" ++ show (elems r)
   show (Machine m r p (c, a)) = "M(rev):" ++ (show . reverse . take 12 . elems $ m)
     ++ ", R(rev):" ++ show (reverse (elems r))
     ++ ", PSW:" ++ show p
@@ -277,12 +276,6 @@ toBitBlocks m = case opcodeAttr m of
   (_, OF0, _, _)    -> []
 
 {-
-toBitBlock :: ASM -> [Int] -> BitBlock
-toBitBlock m c = case oprandFormat m of
-  (OFA2, [a, b]) -> (fromList c .<. 12) .||. (fromAddrMode a .<. 6) .||. (fromAddrMode b .<. 0)
-  (OFA1, [a])    -> (fromList c .<. 6)  .||. (fromAddrMode a .<. 0)
-  (OFI1, [o])    -> (fromList c .<. 8)  .||. fromInt 8 (if o < 0 then 256 + o else mod o 128)
-
 fromASM :: ASM -> String
 fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
 -}

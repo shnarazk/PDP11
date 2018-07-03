@@ -24,7 +24,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.14.0"
+version = "0.14.1"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -36,9 +36,6 @@ makeLenses ''Machine
 -- pdp .^ (psw . s[NZVC])               to access N, Zero, V, Clear
 -- pdp & (psw . s[NZVC]) .~ True        to set N, Z, V, C
 makeLenses ''PSW
-
--- updatePSW :: ((PSW -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> Machine -> Machine
--- updatePSW acs val m = m & (psw . acs) .~ val
 
 type CodeMap = [(Int, ASM)]
 
@@ -75,6 +72,71 @@ fromTrace states = unlines $ zipWith (++) instrs (map show states)
 
 runPDP11 :: Int -> Machine -> [ASM] -> String
 runPDP11 n pdp11 program = fromTrace $ runSimulator n pdp11 program
+
+--------------------------------------------------------------------------------
+
+-- successive memory access
+(!..) :: MemBlock -> Int -> Int
+v !.. i = (v ! (i + 1)) * 256 + (v ! i)
+infixr 9 !..
+
+-- updater of byte array index for an Int
+(<..) :: Int -> Int -> (MemBlock -> MemBlock)
+i <.. x = (// [(i, mod x 256), (i + 1, div x 256)])
+infixl 9 <..
+
+-- updater of Int array index for an Int
+(<.) :: Int -> Int -> (MemBlock -> MemBlock)
+i <. x = (// [(i, x)])
+infixl 9 <.
+
+accessI :: Getting MemBlock Machine MemBlock -> PDPState MemBlock
+accessI block = (^. block) <$> get
+
+updateI :: ASetter Machine Machine MemBlock MemBlock -> (MemBlock -> MemBlock) -> PDPState ()
+updateI block updates = do s <- get; put $ s & block %~ updates
+
+readPSW :: ((Bool -> Const Bool Bool) -> PSW -> Const Bool PSW) -> PDPState Bool
+readPSW acs = (^. (psw . acs)) <$> get
+
+updatePSW :: ((Bool -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> PDPState ()
+updatePSW acs val = do s <- get; put $ s & (psw . acs) .~ val
+
+incrementPC :: PDPState ()
+incrementPC = do reg <- accessI register
+                 updateI register (7 <. (reg ! 7 + 2))
+
+fetchI :: AddrMode -> PDPState (Locator, Int)
+fetchI (Register (Reg i)) = do reg <- accessI register
+                               return (AtRegister i, reg ! i)
+fetchI (Immediate n)      = do incrementPC
+                               return (AsLiteral n, n)
+fetchI (Index o (Reg i))  = do incrementPC
+                               reg <- accessI register
+                               mem <- accessI memory
+                               let n = reg ! i + o
+                               return (AtMemory n, mem !.. n)
+fetchI (AutoInc (Reg j))  = do reg <- accessI register
+                               mem <- accessI memory
+                               let n = reg ! j
+                               updateI register (j <. (n + 2))
+                               return (AtMemory n, mem !.. n)
+fetchI (AutoDec (Reg j))  = do reg <- accessI register
+                               mem <- accessI memory
+                               let n = reg ! j - 2
+                               updateI register (j <. n)
+                               return (AtMemory n, mem !.. n)
+fetchI (Indirect a)       = do (l, v) <- fetchI a
+                               mem <- accessI memory
+                               case l of
+                                 AtRegister _ -> return (AtMemory v, mem !.. v)
+                                 AtMemory _   -> return (AtMemory v, mem !.. v)
+                                 AsLiteral i  -> return (AtMemory (mem !.. i), mem !.. mem !.. i)
+
+storeI :: Locator -> Int -> PDPState ()
+storeI (AtMemory i)   x = updateI memory (i <.. x)
+storeI (AtRegister i) x = updateI register (i <. x)
+storeI (AsLiteral i)  x = updateI memory (i <.. x)
 
 --------------------------------------------------------------------------------
 code :: ASM -> PDPState ()
@@ -204,67 +266,3 @@ code (BEQ o)   = do incrementPC
                     y <- readPSW sZ
                     when y $ storeI p (x + 2 * o)
 
---------------------------------------------------------------------------------
-
--- successive memory access
-(!..) :: MemBlock -> Int -> Int
-v !.. i = (v ! (i + 1)) * 256 + (v ! i)
-infixr 9 !..
-
--- updater of byte array index for an Int
-(<..) :: Int -> Int -> (MemBlock -> MemBlock)
-i <.. x = (// [(i, mod x 256), (i + 1, div x 256)])
-infixl 9 <..
-
--- updater of Int array index for an Int
-(<.) :: Int -> Int -> (MemBlock -> MemBlock)
-i <. x = (// [(i, x)])
-infixl 9 <.
-
-accessI :: Getting MemBlock Machine MemBlock -> PDPState MemBlock
-accessI block = (^. block) <$> get
-
-updateI :: ASetter Machine Machine MemBlock MemBlock -> (MemBlock -> MemBlock) -> PDPState ()
-updateI block updates = do s <- get; put $ s & block %~ updates
-
-readPSW :: ((Bool -> Const Bool Bool) -> PSW -> Const Bool PSW) -> PDPState Bool
-readPSW acs = (^. (psw . acs)) <$> get
-
-updatePSW :: ((Bool -> Identity Bool) -> PSW -> Identity PSW) -> Bool -> PDPState ()
-updatePSW acs val = do s <- get; put $ s & (psw . acs) .~ val
-
-incrementPC :: PDPState ()
-incrementPC = do reg <- accessI register
-                 updateI register (7 <. (reg ! 7 + 2))
-
-fetchI :: AddrMode -> PDPState (Locator, Int)
-fetchI (Register (Reg i)) = do reg <- accessI register
-                               return (AtRegister i, reg ! i)
-fetchI (Immediate n)      = do incrementPC
-                               return (AsLiteral n, n)
-fetchI (Index o (Reg i))  = do incrementPC
-                               reg <- accessI register
-                               mem <- accessI memory
-                               let n = reg ! i + o
-                               return (AtMemory n, mem !.. n)
-fetchI (AutoInc (Reg j))  = do reg <- accessI register
-                               mem <- accessI memory
-                               let n = reg ! j
-                               updateI register (j <. (n + 2))
-                               return (AtMemory n, mem !.. n)
-fetchI (AutoDec (Reg j))  = do reg <- accessI register
-                               mem <- accessI memory
-                               let n = reg ! j - 2
-                               updateI register (j <. n)
-                               return (AtMemory n, mem !.. n)
-fetchI (Indirect a)       = do (l, v) <- fetchI a
-                               mem <- accessI memory
-                               case l of
-                                 AtRegister _ -> return (AtMemory v, mem !.. v)
-                                 AtMemory _   -> return (AtMemory v, mem !.. v)
-                                 AsLiteral i  -> return (AtMemory (mem !.. i), mem !.. mem !.. i)
-
-storeI :: Locator -> Int -> PDPState ()
-storeI (AtMemory i)   x = updateI memory (i <.. x)
-storeI (AtRegister i) x = updateI register (i <. x)
-storeI (AsLiteral i)  x = updateI memory (i <.. x)

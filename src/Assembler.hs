@@ -9,7 +9,7 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.9.0"
+version = "0.9.1"
 
 assemble :: String -> Either String [ASM]
 assemble str = case parse readASMs "ERROR" str of
@@ -39,7 +39,6 @@ readASMs = many1 (spaces *> commands <* newline) <* eof
                       , asmBNE
                       , asmBEQ
                       ]
---               <?> "MOV, ADD, SUB, MUL, or CLR."
 
 registerId :: Parsec String () RegId
 registerId = do
