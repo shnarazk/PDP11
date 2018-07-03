@@ -21,9 +21,10 @@ module PDP11
 
 import Data.Array
 import Data.Bits
+import Data.Maybe
 
 version :: String
-version = "0.8.0"
+version = "0.9.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -119,12 +120,13 @@ data RegId = Reg Int
   deriving (Eq, Ord, Read, Show)
 
 data AddrMode
-  = Register RegId              -- Register
-  | Immediate Int               -- Immediate
-  | Index Int RegId             -- Index
-  | AutoInc RegId               -- Autoincrement
-  | AutoDec RegId               -- Autodecrement
-  | Indirect AddrMode           -- ... Deffered
+  = Register RegId              -- 000 Register
+  | AutoInc RegId               -- 010 Autoincrement
+  | AutoDec RegId               -- 100 Autodecrement
+  | Index Int RegId             -- 110 Index
+  | Indirect AddrMode           -- **1 ... Deffered
+  | Immediate Int               -- 011(R7) Immediate
+
 --  | PCrelat Int
   deriving (Eq, Ord, Read)
 
@@ -160,45 +162,32 @@ data ASM
   | NOP
   deriving (Eq, Ord, Read)
 
-opcodeFormat :: ASM -> (OpFormat, [Int], [AddrMode])
-opcodeFormat (MOV a1 a2) = (OFA2, [0,0,0,1], [a1, a2])
-opcodeFormat (ADD a1 a2) = (OFA2, [1,1,1,0], [a1, a2])
-opcodeFormat (SUB a1 a2) = (OFA2, [0,1,1,0], [a1, a2])
-opcodeFormat (CMP a1 a2) = (OFA2, [0,0,1,0], [a1, a2])
-opcodeFormat (BIT a1 a2) = (OFA2, [0,0,1,1], [a1, a2])
-opcodeFormat (BIC a1 a2) = (OFA2, [0,1,0,0], [a1, a2])
-opcodeFormat (BIS a1 a2) = (OFA2, [0,1,0,1], [a1, a2])
-opcodeFormat (INC a) = (OFA1, [0,0,0,0, 1,0,1,0, 1,0], [a])
-opcodeFormat (DEC a) = (OFA1, [0,0,0,0, 1,0,1,0, 1,1], [a])
-opcodeFormat (NEG a) = (OFA1, [0,0,0,0, 1,0,1,1, 0,0], [a])
-opcodeFormat (CLR a) = (OFA1, [0,0,0,0, 1,0,1,0, 0,0], [a])
-opcodeFormat (ASL a) = (OFA1, [0,0,0,0, 1,1,0,0, 1,0], [a])
-opcodeFormat (ASR a) = (OFA1, [0,0,0,0, 1,1,0,0, 1,1], [a])
-opcodeFormat (JMP a) = (OFA1, [0,0,0,0 ,0,0,0,0, 0,1], [a])
-opcodeFormat (BR o)  = (OFI1, [0,0,0,0, 0,0,0,1], [Immediate o]) -- bad idea wrapping offset
-opcodeFormat (BNE o) = (OFI1, [0,0,0,0, 0,0,1,0], [Immediate o])
-opcodeFormat (BEQ o) = (OFI1, [0,0,0,0, 0,0,1,1], [Immediate o])
-opcodeFormat NOP     = (OF0 , [], [])
+opcodeAttr :: ASM -> (String, OpFormat, [Int], [AddrMode])
+opcodeAttr (MOV a1 a2) = ("MOV", OFA2, [0,0,0,1], [a1, a2])
+opcodeAttr (ADD a1 a2) = ("ADD", OFA2, [1,1,1,0], [a1, a2])
+opcodeAttr (SUB a1 a2) = ("SUB", OFA2, [0,1,1,0], [a1, a2])
+opcodeAttr (CMP a1 a2) = ("CMP", OFA2, [0,0,1,0], [a1, a2])
+opcodeAttr (BIT a1 a2) = ("BIT", OFA2, [0,0,1,1], [a1, a2])
+opcodeAttr (BIC a1 a2) = ("BIC", OFA2, [0,1,0,0], [a1, a2])
+opcodeAttr (BIS a1 a2) = ("BIS", OFA2, [0,1,0,1], [a1, a2])
+opcodeAttr (INC a) = ("INC", OFA1, [0,0,0,0, 1,0,1,0, 1,0], [a])
+opcodeAttr (DEC a) = ("DEC", OFA1, [0,0,0,0, 1,0,1,0, 1,1], [a])
+opcodeAttr (NEG a) = ("NEG", OFA1, [0,0,0,0, 1,0,1,1, 0,0], [a])
+opcodeAttr (CLR a) = ("CLR", OFA1, [0,0,0,0, 1,0,1,0, 0,0], [a])
+opcodeAttr (ASL a) = ("ASL", OFA1, [0,0,0,0, 1,1,0,0, 1,0], [a])
+opcodeAttr (ASR a) = ("ASR", OFA1, [0,0,0,0, 1,1,0,0, 1,1], [a])
+opcodeAttr (JMP a) = ("JMP", OFA1, [0,0,0,0 ,0,0,0,0, 0,1], [a])
+opcodeAttr (BR  o) = ("BR",  OFI1, [0,0,0,0, 0,0,0,1], [Immediate o]) -- bad idea wrapping offset
+opcodeAttr (BNE o) = ("BNE", OFI1, [0,0,0,0, 0,0,1,0], [Immediate o])
+opcodeAttr (BEQ o) = ("BEQ", OFI1, [0,0,0,0, 0,0,1,1], [Immediate o])
+opcodeAttr NOP     = ("NOP", OF0 , [], [])
 
 instance Show ASM where
-  show (MOV a b) = "MOV " ++ show a ++ ", " ++ show b
-  show (ADD a b) = "ADD " ++ show a ++ ", " ++ show b
-  show (SUB a b) = "SUB " ++ show a ++ ", " ++ show b
-  show (CMP a b) = "CMP " ++ show a ++ ", " ++ show b
-  show (BIT a b) = "BIT " ++ show a ++ ", " ++ show b
-  show (BIC a b) = "BIC " ++ show a ++ ", " ++ show b
-  show (BIS a b) = "BIS " ++ show a ++ ", " ++ show b
-  show (INC a)   = "INC " ++ show a
-  show (DEC a)   = "DEC " ++ show a
-  show (NEG a)   = "NEG " ++ show a
-  show (CLR a)   = "CLR " ++ show a
-  show (ASL a)   = "ASL " ++ show a
-  show (ASR a)   = "ASR " ++ show a
-  show (JMP a)   = "JMP " ++ show a
-  show (BR a)    = "BR "  ++ show a
-  show (BNE a)   = "BNE " ++ show a
-  show (BEQ a)   = "BEQ " ++ show a
-  show NOP       = " --- "
+  show m = case opcodeAttr m of
+    (name, OFA2, _, [a, b])        -> name ++ " " ++ show a ++ ", " ++ show b
+    (name, OFA1, _, [a])           -> name ++ " " ++ show a
+    (name, OFI1, _, [Immediate o]) -> name ++ " " ++ show o
+    (name, OF0, _, _)              -> " --- "
 
 -- >> BitBlock 1 0 1 = 1
 -- >> BitBlock 10 1 2 = 10 * 2 = 20
@@ -261,43 +250,31 @@ shiftBitBlock (BitBlock b f t) i = BitBlock b (f + i) (t + i)
 (.<.) = shiftBitBlock
 
 -- toBitBlock width n = BitBlock n width 0
-
 fromAddrMode :: AddrMode -> BitBlock
 fromAddrMode (Register (Reg r)) = (fromList [0,0,0] .<. 3) .||. (fromInt 3 r .<. 0)
-fromAddrMode (Immediate i)      = (fromList [0,0,1] .<. 3) .||. (fromInt 3 7 .<. 0) -- FIXME
-fromAddrMode (Index i (Reg r))  = (fromList [1,1,0] .<. 3) .||. (fromInt 3 r .<. 0) -- FIXME
 fromAddrMode (AutoInc (Reg r))  = (fromList [0,1,0] .<. 3) .||. (fromInt 3 r .<. 0)
 fromAddrMode (AutoDec (Reg r))  = (fromList [1,0,0] .<. 3) .||. (fromInt 3 r .<. 0)
-fromAddrMode (Indirect a )      = (fromList [0,0,1] .<. 3) .||. (fromAddrMode a)
+fromAddrMode (Index i (Reg r))  = (fromList [1,1,0] .<. 3) .||. (fromInt 3 r .<. 0)
+fromAddrMode (Indirect a)       = (fromList [0,0,1] .<. 3) .||. (fromAddrMode a)
+fromAddrMode (Immediate i)      = (fromList [0,1,1] .<. 3) .||. (fromInt 3 7 .<. 0)
 
-extends :: AddrMode -> Bool
-extends (Immediate _) = True
-extends (Index i _)   = True
-extends _            = False
-
-toExtend :: AddrMode -> BitBlock
-toExtend (Immediate i) = fromInt 16 i
-toExtend (Index i _)   = fromInt 16 i
-toExtend (Indirect a)  = toExtend a
-toExtend a             = error $ "toExtend called with an invalid AddrMode " ++ show a
+extends :: AddrMode -> Maybe BitBlock
+extends (Immediate i) = Just $ fromInt 16 i
+extends (Index i _)   = Just $ fromInt 16 i
+extends (Indirect a)  = extends a
+extends _             = Nothing
 
 toBitBlocks :: ASM -> [BitBlock]
-toBitBlocks m = case opcodeFormat m of
-  (OFA2, b, [a1, a2]) ->
+toBitBlocks m = case opcodeAttr m of
+  (_, OFA2, b, as@[a1, a2]) ->
     let blk = (fromList b .<. 12) .||. (fromAddrMode a1 .<. 6) .||. (fromAddrMode a2 .<. 0)
-    in case (extends a1, extends a2) of
-         (True, True)   -> [blk, toExtend a1, toExtend a2]
-         (True, False)  -> [blk, toExtend a1]
-         (False, True)  -> [blk, toExtend a2]
-         (False, False) -> [blk]
-  (OFA1, b, [a]) ->
+    in blk : concatMap maybeToList (map extends as)
+  (_, OFA1, b, [a]) ->
     let blk = (fromList b .<. 6) .||. (fromAddrMode a .<. 0)
-    in case extends a of
-         True  -> [blk, toExtend a]
-         False -> [blk]
-  (OFI1, b, [Immediate o]) ->
+    in blk : maybeToList (extends a)
+  (_, OFI1, b, [Immediate o]) ->
     [(fromList b .<. 8) .||. fromInt 8 (if o < 0 then 256 + o else mod o 128)]
-  (OF0, _, _)    -> []
+  (_, OF0, _, _)    -> []
 
 {-
 toBitBlock :: ASM -> [Int] -> BitBlock
