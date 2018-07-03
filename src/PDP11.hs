@@ -125,8 +125,6 @@ data AddrMode
   | Index Int RegId             -- 110 Index
   | Indirect AddrMode           -- **1 ... Deffered
   | Immediate Int               -- 011(R7) Immediate
-
---  | PCrelat Int
   deriving (Eq, Ord, Read)
 
 instance Show AddrMode where
