@@ -23,7 +23,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.7.2"
+version = "0.8.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -149,6 +149,7 @@ data ASM
 --  | MUL AddrMode AddrMode
   | INC AddrMode
   | DEC AddrMode
+  | NEG AddrMode
   | CLR AddrMode
   | ASL AddrMode
   | ASR AddrMode
@@ -169,6 +170,7 @@ opcodeFormat (BIC a1 a2) = (OFA2, [0,1,0,0], [a1, a2])
 opcodeFormat (BIS a1 a2) = (OFA2, [0,1,0,1], [a1, a2])
 opcodeFormat (INC a) = (OFA1, [0,0,0,0, 1,0,1,0, 1,0], [a])
 opcodeFormat (DEC a) = (OFA1, [0,0,0,0, 1,0,1,0, 1,1], [a])
+opcodeFormat (NEG a) = (OFA1, [0,0,0,0, 1,0,1,1, 0,0], [a])
 opcodeFormat (CLR a) = (OFA1, [0,0,0,0, 1,0,1,0, 0,0], [a])
 opcodeFormat (ASL a) = (OFA1, [0,0,0,0, 1,1,0,0, 1,0], [a])
 opcodeFormat (ASR a) = (OFA1, [0,0,0,0, 1,1,0,0, 1,1], [a])
@@ -188,6 +190,7 @@ instance Show ASM where
   show (BIS a b) = "BIS " ++ show a ++ ", " ++ show b
   show (INC a)   = "INC " ++ show a
   show (DEC a)   = "DEC " ++ show a
+  show (NEG a)   = "NEG " ++ show a
   show (CLR a)   = "CLR " ++ show a
   show (ASL a)   = "ASL " ++ show a
   show (ASR a)   = "ASR " ++ show a

@@ -9,7 +9,7 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.8.0"
+version = "0.9.0"
 
 assemble :: String -> Either String [ASM]
 assemble str = case parse readASMs "ERROR" str of
@@ -24,16 +24,16 @@ readASMs = many1 (spaces *> commands <* newline) <* eof
     commands = choice [ asmMOV
                       , asmADD
                       , asmSUB
---                      , asmMUL
-                      , asmCLR
-                      , asmASL
-                      , asmASR
                       , asmCMP
                       , asmBIT
                       , asmBIC
                       , asmBIS
                       , asmINC
                       , asmDEC
+                      , asmNEG
+                      , asmCLR
+                      , asmASL
+                      , asmASR
                       , asmJMP
                       , asmBR
                       , asmBNE
@@ -101,6 +101,8 @@ twoAddrs = do
   y <- spaces *> addrMode
   return $ (x, y)
 
+---------------------------------------------------------
+
 asmMOV :: Parsec String () ASM
 asmMOV = uncurry MOV <$> (try (string "MOV ") *> twoAddrs)
 
@@ -109,18 +111,6 @@ asmADD = uncurry ADD <$> (try (string "ADD ") *> twoAddrs)
 
 asmSUB :: Parsec String () ASM
 asmSUB = uncurry ADD <$> (try (string "SUB ") *> twoAddrs)
-
--- asmMUL :: Parsec String () ASM
--- asmMUL = uncurry ADD <$> (try (string "MUL ") *> twoAddrs)
-
-asmCLR :: Parsec String () ASM
-asmCLR = CLR <$> (try (string "CLR ") *> oneAddr)
-
-asmASL :: Parsec String () ASM
-asmASL = ASL <$> (try (string "ASL ") *> oneAddr)
-
-asmASR :: Parsec String () ASM
-asmASR = ASR <$> (try (string "ASR ") *> oneAddr)
 
 asmCMP :: Parsec String () ASM
 asmCMP = uncurry CMP <$> (try (string "CMP ") *> twoAddrs)
@@ -134,11 +124,26 @@ asmBIC = uncurry BIC <$> (try (string "BIC ") *> twoAddrs)
 asmBIS :: Parsec String () ASM
 asmBIS = uncurry BIS <$> (try (string "BIS ") *> twoAddrs)
 
+-- asmMUL :: Parsec String () ASM
+-- asmMUL = uncurry ADD <$> (try (string "MUL ") *> twoAddrs)
+
 asmINC :: Parsec String () ASM
 asmINC = INC <$> (try (string "INC ") *> oneAddr)
 
 asmDEC :: Parsec String () ASM
-asmDEC =  DEC <$> (try (string "DEC ") *> oneAddr)
+asmDEC = DEC <$> (try (string "DEC ") *> oneAddr)
+
+asmNEG :: Parsec String () ASM
+asmNEG = NEG <$> (try (string "NEG ") *> oneAddr)
+
+asmCLR :: Parsec String () ASM
+asmCLR = CLR <$> (try (string "CLR ") *> oneAddr)
+
+asmASL :: Parsec String () ASM
+asmASL = ASL <$> (try (string "ASL ") *> oneAddr)
+
+asmASR :: Parsec String () ASM
+asmASR = ASR <$> (try (string "ASR ") *> oneAddr)
 
 asmJMP :: Parsec String () ASM
 asmJMP = JMP <$> (try (string "JMP ") *> oneAddr)

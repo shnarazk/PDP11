@@ -24,7 +24,7 @@ import PDP11 hiding (version)
 import Assembler (assemble)
 
 version :: String
-version = "0.13.0"
+version = "0.14.0"
 
 -- * m ^. register ^? iix 2       	    to access R2 maybe
 -- * m ^. register & iix 2 .~ 300 	    to update R2 = 300
@@ -76,6 +76,7 @@ fromTrace states = unlines $ zipWith (++) instrs (map show states)
 runPDP11 :: Int -> Machine -> [ASM] -> String
 runPDP11 n pdp11 program = fromTrace $ runSimulator n pdp11 program
 
+--------------------------------------------------------------------------------
 code :: ASM -> PDPState ()
 code (MOV s d) = do incrementPC
                     (_, x) <- fetchI s
@@ -101,36 +102,6 @@ code (SUB s d) = do incrementPC
                     updatePSW sN (x' < 0)
                     updatePSW sZ (x' == 0)
                     updatePSW sV (2 ^ 15 < x')
-
--- code (MUL s d) = do (_, x) <- fetchI s
---                     (p, y) <- fetchI d
---                     storeI p (y * x)
-
-code (CLR d)   = do incrementPC
-                    (p, _) <- fetchI d
-                    storeI p 0
-                    updatePSW sN False
-                    updatePSW sZ True
-                    updatePSW sV False
-                    updatePSW sC False
-
-code (ASL d)   = do incrementPC
-                    (p, x) <- fetchI d
-                    let x' = shiftL x 1
-                    storeI p x'
-                    updatePSW sN (x' < 0)
-                    updatePSW sZ (x' == 0)
-                    updatePSW sV (2 ^ 15 < x')
-                    updatePSW sC False
-
-code (ASR d)   = do incrementPC
-                    (p, x) <- fetchI d
-                    let x' = shiftR x 1
-                    storeI p x'
-                    updatePSW sN (x' < 0)
-                    updatePSW sZ (x' == 0)
-                    updatePSW sV (2 ^ 15 < x')
-                    updatePSW sC False
 
 code (CMP s d) = do incrementPC
                     (_, x) <- fetchI s
@@ -161,6 +132,10 @@ code (BIS s d) = do incrementPC
                     updatePSW sZ (y .&. x == 0)
                     updatePSW sV False
 
+-- code (MUL s d) = do (_, x) <- fetchI s
+--                     (p, y) <- fetchI d
+--                     storeI p (y * x)
+
 code (INC s)   = do incrementPC
                     (p, x) <- fetchI s
                     let x' = x + 1
@@ -176,6 +151,40 @@ code (DEC s)   = do incrementPC
                     updatePSW sN (x' < 0)
                     updatePSW sZ (x' == 0)
                     updatePSW sV (2 ^ 15 < x')
+
+code (NEG s)   = do incrementPC
+                    (p, x) <- fetchI s
+                    let x' = negate x
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
+
+code (CLR d)   = do incrementPC
+                    (p, _) <- fetchI d
+                    storeI p 0
+                    updatePSW sN False
+                    updatePSW sZ True
+                    updatePSW sV False
+                    updatePSW sC False
+
+code (ASL d)   = do incrementPC
+                    (p, x) <- fetchI d
+                    let x' = shiftL x 1
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
+                    updatePSW sC False
+
+code (ASR d)   = do incrementPC
+                    (p, x) <- fetchI d
+                    let x' = shiftR x 1
+                    storeI p x'
+                    updatePSW sN (x' < 0)
+                    updatePSW sZ (x' == 0)
+                    updatePSW sV (2 ^ 15 < x')
+                    updatePSW sC False
 
 code (JMP s)   = do incrementPC
                     (_, x) <- fetchI s
