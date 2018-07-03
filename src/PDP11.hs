@@ -23,7 +23,7 @@ import Data.Array
 import Data.Bits
 
 version :: String
-version = "0.7.1"
+version = "0.7.2"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -136,6 +136,8 @@ instance Show AddrMode where
   show (AutoDec (Reg r))  = "-(R" ++ show r ++ ")"
   show (Indirect x)       = '@' : show x
 
+data OpFormat = OFA1 | OFA2 | OFI1 | OF0
+
 data ASM
   = MOV AddrMode AddrMode
   | ADD AddrMode AddrMode
@@ -144,9 +146,9 @@ data ASM
   | BIT AddrMode AddrMode
   | BIC AddrMode AddrMode
   | BIS AddrMode AddrMode
+--  | MUL AddrMode AddrMode
   | INC AddrMode
   | DEC AddrMode
---  | MUL AddrMode AddrMode
   | CLR AddrMode
   | ASL AddrMode
   | ASR AddrMode
@@ -156,6 +158,25 @@ data ASM
   | BEQ Int
   | NOP
   deriving (Eq, Ord, Read)
+
+opcodeFormat :: ASM -> (OpFormat, [Int], [AddrMode])
+opcodeFormat (MOV a1 a2) = (OFA2, [0,0,0,1], [a1, a2])
+opcodeFormat (ADD a1 a2) = (OFA2, [1,1,1,0], [a1, a2])
+opcodeFormat (SUB a1 a2) = (OFA2, [0,1,1,0], [a1, a2])
+opcodeFormat (CMP a1 a2) = (OFA2, [0,0,1,0], [a1, a2])
+opcodeFormat (BIT a1 a2) = (OFA2, [0,0,1,1], [a1, a2])
+opcodeFormat (BIC a1 a2) = (OFA2, [0,1,0,0], [a1, a2])
+opcodeFormat (BIS a1 a2) = (OFA2, [0,1,0,1], [a1, a2])
+opcodeFormat (INC a) = (OFA1, [0,0,0,0, 1,0,1,0, 1,0], [a])
+opcodeFormat (DEC a) = (OFA1, [0,0,0,0, 1,0,1,0, 1,1], [a])
+opcodeFormat (CLR a) = (OFA1, [0,0,0,0, 1,0,1,0, 0,0], [a])
+opcodeFormat (ASL a) = (OFA1, [0,0,0,0, 1,1,0,0, 1,0], [a])
+opcodeFormat (ASR a) = (OFA1, [0,0,0,0, 1,1,0,0, 1,1], [a])
+opcodeFormat (JMP a) = (OFA1, [0,0,0,0 ,0,0,0,0, 0,1], [a])
+opcodeFormat (BR o)  = (OFI1, [0,0,0,0, 0,0,0,1], [Immediate o]) -- bad idea wrapping offset
+opcodeFormat (BNE o) = (OFI1, [0,0,0,0, 0,0,1,0], [Immediate o])
+opcodeFormat (BEQ o) = (OFI1, [0,0,0,0, 0,0,1,1], [Immediate o])
+opcodeFormat NOP     = (OF0 , [], [])
 
 instance Show ASM where
   show (MOV a b) = "MOV " ++ show a ++ ", " ++ show b
@@ -246,50 +267,6 @@ fromAddrMode (AutoInc (Reg r))  = (fromList [0,1,0] .<. 3) .||. (fromInt 3 r .<.
 fromAddrMode (AutoDec (Reg r))  = (fromList [1,0,0] .<. 3) .||. (fromInt 3 r .<. 0)
 fromAddrMode (Indirect a )      = (fromList [0,0,1] .<. 3) .||. (fromAddrMode a)
 
-toBitBlock :: ASM -> BitBlock
-toBitBlock (CLR a1)    = (fromList [0,0,0,0, 1,0,1,0, 0,0] .<. 6)
-                         .||. (fromAddrMode a1 .<. 0)
-toBitBlock (ASL a1)    = (fromList [0,0,0,0, 1,1,0,0, 1,0] .<. 6)
-                         .||. (fromAddrMode a1 .<. 0)
-toBitBlock (ASR a1)    = (fromList [0,0,0,0, 1,1,0,0, 1,1] .<. 6)
-                         .||. (fromAddrMode a1 .<. 0)
-toBitBlock (MOV a1 a2) = (fromList [0,0,0,1] .<. 12)
-                         .||. (fromAddrMode a1 .<. 6)
-                         .||. (fromAddrMode a2 .<. 0)
-toBitBlock (SUB a1 a2) = (fromList [0,1,1,0] .<. 12)
-                         .||. (fromAddrMode a1 .<. 6)
-                         .||. (fromAddrMode a2 .<. 0)
-toBitBlock (ADD a1 a2) = (fromList [1,1,1,0] .<. 12)
-                         .||. (fromAddrMode a1 .<. 6)
-                         .||. (fromAddrMode a2 .<. 0)
-toBitBlock (CMP a1 a2) = (fromList [0,0,1,0] .<. 12)
-                         .||. (fromAddrMode a1 .<. 6)
-                         .||. (fromAddrMode a2 .<. 0)
-toBitBlock (BIT a1 a2) = (fromList [0,0,1,1] .<. 12)
-                         .||. (fromAddrMode a1 .<. 6)
-                         .||. (fromAddrMode a2 .<. 0)
-toBitBlock (BIC a1 a2) = (fromList [0,1,0,0] .<. 12)
-                         .||. (fromAddrMode a1 .<. 6)
-                         .||. (fromAddrMode a2 .<. 0)
-toBitBlock (BIS a1 a2) = (fromList [0,1,0,1] .<. 12)
-                         .||. (fromAddrMode a1 .<. 6)
-                         .||. (fromAddrMode a2 .<. 0)
-toBitBlock (INC a1)    = (fromList [0,0,0,0,1,0,1,0,1,0] .<. 6)
-                         .||. (fromAddrMode a1 .<. 0)
-toBitBlock (DEC a1)    = (fromList [0,0,0,0,1,0,1,0,1,1] .<. 6)
-                         .||. (fromAddrMode a1 .<. 0)
-toBitBlock (JMP a1)    = (fromList [0,0,0,0 ,0,0,0,0, 0,1] .<. 6)
-                         .||. (fromAddrMode a1 .<. 0)
-toBitBlock (BR ofs)    = (fromList [0,0,0,0, 0,0,0,1] .<. 8)
-                         .||. fromInt 8 (if ofs < 0 then 256 + ofs else mod ofs 128)
-toBitBlock (BNE ofs)   = (fromList [0,0,0,0,0 ,0,1,0] .<. 8)
-                         .||. fromInt 8 (if ofs < 0 then 256 + ofs else mod ofs 128)
-toBitBlock (BEQ ofs)   = (fromList [0,0,0,0,0 ,0,1,1] .<. 8)
-                         .||. fromInt 8 (if ofs < 0 then 256 + ofs else mod ofs 128)
-
--- fromASM :: ASM -> String
--- fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
-
 extends :: AddrMode -> Bool
 extends (Immediate _) = True
 extends (Index i _)   = True
@@ -302,59 +279,30 @@ toExtend (Indirect a)  = toExtend a
 toExtend a             = error $ "toExtend called with an invalid AddrMode " ++ show a
 
 toBitBlocks :: ASM -> [BitBlock]
-toBitBlocks m@(CLR a1) = case extends a1 of
-                           True -> [toBitBlock m, toExtend a1]
-                           False -> [toBitBlock m]
-toBitBlocks m@(ASL a1) = case extends a1 of
-                           True -> [toBitBlock m, toExtend a1]
-                           False -> [toBitBlock m]
-toBitBlocks m@(ASR a1) = case extends a1 of
-                           True -> [toBitBlock m, toExtend a1]
-                           False -> [toBitBlock m]
-toBitBlocks m@(MOV a1 a2) = case (extends a1, extends a2) of
-                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
-                              (True, False)  -> [toBitBlock m, toExtend a1]
-                              (False, True)  -> [toBitBlock m, toExtend a2]
-                              (False, False) -> [toBitBlock m]
-toBitBlocks m@(SUB a1 a2) = case (extends a1, extends a2) of
-                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
-                              (True, False)  -> [toBitBlock m, toExtend a1]
-                              (False, True)  -> [toBitBlock m, toExtend a2]
-                              (False, False) -> [toBitBlock m]
-toBitBlocks m@(ADD a1 a2) = case (extends a1, extends a2) of
-                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
-                              (True, False)  -> [toBitBlock m, toExtend a1]
-                              (False, True)  -> [toBitBlock m, toExtend a2]
-                              (False, False) -> [toBitBlock m]
-toBitBlocks m@(CMP a1 a2) = case (extends a1, extends a2) of
-                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
-                              (True, False)  -> [toBitBlock m, toExtend a1]
-                              (False, True)  -> [toBitBlock m, toExtend a2]
-                              (False, False) -> [toBitBlock m]
-toBitBlocks m@(BIT a1 a2) = case (extends a1, extends a2) of
-                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
-                              (True, False)  -> [toBitBlock m, toExtend a1]
-                              (False, True)  -> [toBitBlock m, toExtend a2]
-                              (False, False) -> [toBitBlock m]
-toBitBlocks m@(BIC a1 a2) = case (extends a1, extends a2) of
-                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
-                              (True, False)  -> [toBitBlock m, toExtend a1]
-                              (False, True)  -> [toBitBlock m, toExtend a2]
-                              (False, False) -> [toBitBlock m]
-toBitBlocks m@(BIS a1 a2) = case (extends a1, extends a2) of
-                              (True, True)   -> [toBitBlock m, toExtend a1, toExtend a2]
-                              (True, False)  -> [toBitBlock m, toExtend a1]
-                              (False, True)  -> [toBitBlock m, toExtend a2]
-                              (False, False) -> [toBitBlock m]
-toBitBlocks m@(INC a) = case extends a of
-                              True   -> [toBitBlock m, toExtend a]
-                              False  -> [toBitBlock m]
-toBitBlocks m@(DEC a) = case extends a of
-                              True   -> [toBitBlock m, toExtend a]
-                              False  -> [toBitBlock m]
-toBitBlocks m@(JMP a) = case extends a of
-                              True   -> [toBitBlock m, toExtend a]
-                              False  -> [toBitBlock m]
-toBitBlocks m@(BR _)  = [toBitBlock m]
-toBitBlocks m@(BNE _) = [toBitBlock m]
-toBitBlocks m@(BEQ _) = [toBitBlock m]
+toBitBlocks m = case opcodeFormat m of
+  (OFA2, b, [a1, a2]) ->
+    let blk = (fromList b .<. 12) .||. (fromAddrMode a1 .<. 6) .||. (fromAddrMode a2 .<. 0)
+    in case (extends a1, extends a2) of
+         (True, True)   -> [blk, toExtend a1, toExtend a2]
+         (True, False)  -> [blk, toExtend a1]
+         (False, True)  -> [blk, toExtend a2]
+         (False, False) -> [blk]
+  (OFA1, b, [a]) ->
+    let blk = (fromList b .<. 6) .||. (fromAddrMode a .<. 0)
+    in case extends a of
+         True  -> [blk, toExtend a]
+         False -> [blk]
+  (OFI1, b, [Immediate o]) ->
+    [(fromList b .<. 8) .||. fromInt 8 (if o < 0 then 256 + o else mod o 128)]
+  (OF0, _, _)    -> []
+
+{-
+toBitBlock :: ASM -> [Int] -> BitBlock
+toBitBlock m c = case oprandFormat m of
+  (OFA2, [a, b]) -> (fromList c .<. 12) .||. (fromAddrMode a .<. 6) .||. (fromAddrMode b .<. 0)
+  (OFA1, [a])    -> (fromList c .<. 6)  .||. (fromAddrMode a .<. 0)
+  (OFI1, [o])    -> (fromList c .<. 8)  .||. fromInt 8 (if o < 0 then 256 + o else mod o 128)
+
+fromASM :: ASM -> String
+fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
+-}
