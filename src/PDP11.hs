@@ -3,8 +3,6 @@ module PDP11
       version
     , makePDP11
     , initialMachine
-    , resetPSW
-    , setTrace
     -- * Plumbing
     , MemBlock
     , PSW()
@@ -17,47 +15,19 @@ module PDP11
     , Opcode(..)
     , ASM(..)
     , toBitBlocks
-    , asInts
+    , asInt
+    , encode
+    , decodeWord
     ) where
 
 import Data.Array
 import Data.Bits
+import Data.List
 import Data.Maybe
 
 version :: String
 version = "0.90.0"
 
-{-
-- https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
-If N is an address in memory then (N) is the data stored at the address N.
-Syntax       Mode                          Action
-Rn           Register                      Data = Rn
-(Rn)+        Autoincrement                 Data = (Rn)
-                                           Rn++
--(Rn)        Autodecrement                 Rn–
-                                           Data = (Rn)
-X(Rn)        Index                         Offset address X = (PC)
-                                           PC += 2
-                                           Base address = Rn
-                                           Data = (Rn + X)
-@Rn or (Rn)  Register Deferred             Data = (Rn)
-@(Rn)+       Autoincrement Deferred        Data =((Rn))
-                                           Rn++
-@-(Rn)       Autodecrement Deferred        Rn–
-                                           Data =((Rn))
-@X(Rn)       Index Deferred                Offset address X = (PC)
-                                           PC += 2
-                                           Base address = Rn
-                                           Data = ((Rn + X))
-#n           Immediate                     Data = (PC) = n
-@#A          Immediate Deferred (Absolute) Data = ((PC)) = (A)
-A or X(PC)   Relative                      Offset address X = (PC)
-                                           PC += 2
-                                           Data = (PC + X) = (A)
-@A or @X(PC) Relative Deferred             Offset address X = (PC)
-                                           PC += 2
-                                           Data = ((PC + X)) = ((A))
--}
 type MemBlock = Array Int Int
 
 data PSW = PSW { _sN :: Bool
@@ -85,7 +55,7 @@ instance Show Machine where
   show (Machine m r p (c, a)) = "M(rev):" ++ (show . reverse . take 12 . elems $ m)
     ++ ", R(rev):" ++ show (reverse (elems r))
     ++ ", PSW:" ++ show p
-    ++ ", Trace:" ++ show a ++ " @" ++ show c
+    ++ if c == -1 then " -- initial state " else " by " ++ show a ++ " @" ++ show c
 dump :: Machine -> ([Int], [Int], [Int], Int, ASM)
 dump (Machine m r (PSW p1 p2 p3 p4) (c, a)) = (elems m, elems r, map fromEnum [p1, p2, p3, p4], c, a)
 
@@ -97,15 +67,6 @@ makePDP11 b1 b2 = Machine (chunk b1) (chunk b2) (PSW False False False False) (-
 
 initialMachine :: Machine -- memory is at left; register is at right.
 initialMachine = makePDP11 [2, 0, 4, 0, 8, 0, 0, 1, 1, 1, 0, 0] [0, 2, 0, 4, 0, 6, 1, 100]
-
-setTrace :: (Int, ASM) -> Machine -> Machine
-setTrace p m = m { _trace = p }
-
-resetPSW :: Machine -> Machine
-resetPSW (Machine m r _ t) = Machine m' r (_psw initialMachine) t
-  where
-    m' = accumArray (+) 0 (0, n) $ [(i, m ! i) | i <- [0 .. n]]
-    n = snd $ bounds (_memory initialMachine)
 
 -- misc accessors
 _pc :: Machine -> Int
@@ -137,6 +98,7 @@ instance Show AddrMode where
   show (Indirect x)       = '@' : show x
 
 data OpFormat = OFA1 | OFA2 | OFI1 | OF0
+  deriving (Eq, Ord, Read, Show)
 
 data Opcode
   = MOV
@@ -156,7 +118,7 @@ data Opcode
   | BR
   | BNE
   | BEQ
-  deriving (Eq, Ord, Read)
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 data ASM
   = Inst2 Opcode AddrMode AddrMode
@@ -165,25 +127,35 @@ data ASM
   | NOP
   deriving (Eq, Ord, Read)
 
+codeTable :: [(Opcode, [Int], OpFormat)]
+codeTable =
+  [ (MOV, [0,0,0,1], OFA2)
+  , (ADD, [1,1,1,0], OFA2)
+  , (SUB, [0,1,1,0], OFA2)
+  , (CMP, [0,0,1,0], OFA2)
+  , (BIT, [0,0,1,1], OFA2)
+  , (BIC, [0,1,0,0], OFA2)
+  , (BIS, [0,1,0,1], OFA2)
+  , (INC, [0,0,0,0, 1,0,1,0, 1,0], OFA1)
+  , (DEC, [0,0,0,0, 1,0,1,0, 1,1], OFA1)
+  , (NEG, [0,0,0,0, 1,0,1,1, 0,0], OFA1)
+  , (CLR, [0,0,0,0, 1,0,1,0, 0,0], OFA1)
+  , (ASL, [0,0,0,0, 1,1,0,0, 1,0], OFA1)
+  , (ASR, [0,0,0,0, 1,1,0,0, 1,1], OFA1)
+  , (JMP, [0,0,0,0 ,0,0,0,0, 0,1], OFA1)
+  , (BR , [0,0,0,0, 0,0,0,1], OFI1)
+  , (BNE, [0,0,0,0, 0,0,1,0], OFI1)
+  , (BEQ, [0,0,0,0, 0,0,1,1], OFI1)
+  ]
+
+asBinaryCode :: Opcode -> [Int]
+asBinaryCode op = maybe [] (\(_, b, _) -> b) $ find (\(o, b, t) -> o == op) codeTable
+
 opcodeAttr :: ASM -> (String, OpFormat, [Int], [AddrMode])
-opcodeAttr (Inst2 MOV a1 a2) = ("MOV", OFA2, [0,0,0,1], [a1, a2])
-opcodeAttr (Inst2 ADD a1 a2) = ("ADD", OFA2, [1,1,1,0], [a1, a2])
-opcodeAttr (Inst2 SUB a1 a2) = ("SUB", OFA2, [0,1,1,0], [a1, a2])
-opcodeAttr (Inst2 CMP a1 a2) = ("CMP", OFA2, [0,0,1,0], [a1, a2])
-opcodeAttr (Inst2 BIT a1 a2) = ("BIT", OFA2, [0,0,1,1], [a1, a2])
-opcodeAttr (Inst2 BIC a1 a2) = ("BIC", OFA2, [0,1,0,0], [a1, a2])
-opcodeAttr (Inst2 BIS a1 a2) = ("BIS", OFA2, [0,1,0,1], [a1, a2])
-opcodeAttr (Inst1 INC a)     = ("INC", OFA1, [0,0,0,0, 1,0,1,0, 1,0], [a])
-opcodeAttr (Inst1 DEC a)     = ("DEC", OFA1, [0,0,0,0, 1,0,1,0, 1,1], [a])
-opcodeAttr (Inst1 NEG a)     = ("NEG", OFA1, [0,0,0,0, 1,0,1,1, 0,0], [a])
-opcodeAttr (Inst1 CLR a)     = ("CLR", OFA1, [0,0,0,0, 1,0,1,0, 0,0], [a])
-opcodeAttr (Inst1 ASL a)     = ("ASL", OFA1, [0,0,0,0, 1,1,0,0, 1,0], [a])
-opcodeAttr (Inst1 ASR a)     = ("ASR", OFA1, [0,0,0,0, 1,1,0,0, 1,1], [a])
-opcodeAttr (Inst1 JMP a)     = ("JMP", OFA1, [0,0,0,0 ,0,0,0,0, 0,1], [a])
-opcodeAttr (Inst0 BR  o)     = ("BR",  OFI1, [0,0,0,0, 0,0,0,1], [Immediate o]) -- bad idea wrapping offset
-opcodeAttr (Inst0 BNE o)     = ("BNE", OFI1, [0,0,0,0, 0,0,1,0], [Immediate o])
-opcodeAttr (Inst0 BEQ o)     = ("BEQ", OFI1, [0,0,0,0, 0,0,1,1], [Immediate o])
-opcodeAttr NOP               = ("NOP", OF0 , [], [])
+opcodeAttr (Inst2 op a1 a2) = (show op, OFA2, (asBinaryCode op), [a1, a2])
+opcodeAttr (Inst1 op a)     = (show op, OFA1, (asBinaryCode op), [a])
+opcodeAttr (Inst0 op o)     = (show op, OFI1, (asBinaryCode op), [Immediate o]) -- wrapping offset
+opcodeAttr NOP              = ("NOP", OF0 , [], [])
 
 instance Show ASM where
   show m = case opcodeAttr m of
@@ -236,6 +208,9 @@ asInts ::BitBlock -> [Int]
 asInts (BitBlock v f _) = [mod x 256, div x 256]
   where x = shiftL v f
 
+asInt ::BitBlock -> Int
+asInt (BitBlock v f _) = shiftL v f
+
 (.||.) :: BitBlock -> BitBlock -> BitBlock
 (.||.)  a b = a + b
 
@@ -259,13 +234,18 @@ fromAddrMode (AutoInc (Reg r))  = (fromList [0,1,0] .<. 3) .||. (fromInt 3 r .<.
 fromAddrMode (AutoDec (Reg r))  = (fromList [1,0,0] .<. 3) .||. (fromInt 3 r .<. 0)
 fromAddrMode (Index i (Reg r))  = (fromList [1,1,0] .<. 3) .||. (fromInt 3 r .<. 0)
 fromAddrMode (Indirect a)       = (fromList [0,0,1] .<. 3) .||. (fromAddrMode a)
-fromAddrMode (Immediate i)      = (fromList [0,1,1] .<. 3) .||. (fromInt 3 7 .<. 0)
+fromAddrMode (Immediate i)      = (fromList [0,1,0] .<. 3) .||. (fromInt 3 7 .<. 0)
 
 extends :: AddrMode -> Maybe BitBlock
 extends (Immediate i) = Just $ fromInt 16 i
 extends (Index i _)   = Just $ fromInt 16 i
 extends (Indirect a)  = extends a
 extends _             = Nothing
+
+injectOffset :: AddrMode -> Int -> AddrMode
+injectOffset (Index _ r) x  = Index x r
+injectOffset (Indirect a) x = Indirect (injectOffset a x)
+injectOffset a _ = a
 
 toBitBlocks :: ASM -> [BitBlock]
 toBitBlocks m = case opcodeAttr m of
@@ -283,3 +263,46 @@ toBitBlocks m = case opcodeAttr m of
 fromASM :: ASM -> String
 fromASM a = [ if testBit (value b) n then '1' else '0' | b <- toBitBlocks a,  n <- [15,14..0] ]
 -}
+
+fromBinaryList :: [Int] -> Int
+fromBinaryList l = foldr (\a b -> a + 2 * b) 0 $ reverse l
+
+asBinaryList :: Int -> [Int]
+asBinaryList = reverse . take 16 . map (`mod` 2) . iterate (`div` 2)
+
+decodeWord :: Int -> (Int, Int) -> (Int, ASM)
+decodeWord x (x1, x2)
+  | Just (op, _, t) <- find (\(_, b, _) -> b `isPrefixOf` bits) codeTable =
+      case t of
+        OFA2 -> let a1 = am 11 6
+                    a2 = am 5 0
+                in case (extends a1, extends a2) of
+                     (Just _, Just _)   -> (2, Inst2 op (injectOffset a1 x1) (injectOffset a2 x2))
+                     (Just _, Nothing)  -> (1, Inst2 op (injectOffset a1 x1) a2)
+                     (Nothing, Just _)  -> (1, Inst2 op a1 (injectOffset a2 x2))
+                     (Nothing, Nothing) -> (0, Inst2 op a1 a2)
+        OFA1 -> let a = am 5 0
+                in case extends a of
+                     Just _  -> (1, Inst1 op (injectOffset a x1))
+                     Nothing -> (0, Inst1 op a)
+        OFI1 -> (0, Inst0 op (fromBinaryList (drop 8 bits)))
+  | otherwise = error $ "invalid code: " ++ show x
+  where
+    bits = asBinaryList x
+    am l r = decodeAddrMode $ drop (15 - l) $ take (16 - r) bits
+
+decodeAddrMode :: [Int] -> AddrMode
+decodeAddrMode l = case take 3 l of
+  [0,0,0] -> Register (Reg i)
+  [0,1,0] -> AutoInc (Reg i)
+  [1,0,0] -> AutoDec (Reg i)
+  [1,1,0] -> Index 0 (Reg i)
+  [0,0,1] -> Indirect (Register (Reg i))
+  [0,1,1] -> Indirect (AutoInc (Reg i))
+  [1,0,1] -> Indirect (AutoDec (Reg i))
+  [1,1,1] -> Indirect (Index 0 (Reg i))
+  where
+    i = fromBinaryList (drop 3 l)
+
+encode :: [ASM] -> [Int]
+encode = concatMap asInts . concatMap toBitBlocks

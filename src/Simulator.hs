@@ -8,8 +8,6 @@
 module Simulator
     (
       version
-    , PSW(..)
-    , Machine(..)
     , runSimulator
     , fromTrace
     ) where
@@ -45,30 +43,48 @@ newtype PDPState a = PDPState (State Machine a)
 codemap :: Int -> [ASM] -> CodeMap
 codemap addr l = zip (scanl (\a c -> a + (2 * length (toBitBlocks c))) addr l) l
 
-injectCode :: Machine -> CodeMap -> Machine
+injectCode :: Machine -> [ASM] -> Machine
 injectCode pdp c = pdp & memory .~ m'
   where
     adr = _pc pdp
     n = length b
     m' = accumArray (+) 0 (0, adr + n) $ assocs (pdp ^. memory) ++ zip [adr ..] b
-    b = concatMap asInts $ concatMap (toBitBlocks . snd) c
+    b = encode c
+
+fetchInst :: Machine -> (ASM, Machine)
+fetchInst m = (c, m')
+  where
+    m' = m { _trace = (p, c),
+             _register = (_register m) // [(7, p + d)]
+           }
+    p = _pc m
+    i0 = (_memory m) !.. p
+    i1 = (_memory m) !.. (p + 2)
+    i2 = (_memory m) !.. (p + 4)
+    (d, c) = decodeWord i0 (i1, i2)
+
+resetPSW :: Machine -> Machine
+resetPSW (Machine m r _ t) = Machine m' r (_psw initialMachine) t
+  where
+    m' = accumArray (+) 0 (0, n) $ [(i, m ! i) | i <- [0 .. n]]
+    n = snd $ bounds (_memory initialMachine)
 
 runSimulator :: Int -> Machine -> [ASM] -> [Machine]
-runSimulator n initM' asm = take n $ initM : runI initM
-  where imap = codemap (_pc initM') asm
-        initM = injectCode initM' imap
+runSimulator n initM' prg = take n $ initM : runI initM
+  where imap = codemap (_pc initM') prg
+        initM = injectCode initM' prg
         runI :: Machine -> [Machine]
         runI m
-          | Just a <- lookup (_pc m) imap =
-              let m' = execState execute $ setTrace ((_pc m), a) m
+          | Just _ <- lookup (_pc m) imap =
+              let m'' = execState execute m'
+                  (a, m') = fetchInst m
                   (PDPState execute) = code a
-              in m' : runI m'
+              in m'' : runI m''
           | otherwise = []
 
 fromTrace :: [Machine] -> String
-fromTrace states = unlines $ zipWith (++) instrs (map show states)
-  where instrs = "#0\tInitial state\n" : zipWith combine [1 :: Int .. ] (map (^. trace) states)
-        combine n (a, c) = "#" ++ show n ++ "\t" ++ show c ++ "\t@ " ++ show a ++ "\n"
+fromTrace states = unlines $ zipWith combine [0 :: Int .. ] states
+  where combine n c = "#" ++ show n ++ "\t" ++ show c
 
 runPDP11 :: Int -> Machine -> [ASM] -> String
 runPDP11 n pdp11 program = fromTrace $ runSimulator n pdp11 program
