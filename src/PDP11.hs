@@ -14,6 +14,7 @@ module PDP11
     , Locator(..)
     , RegId(..)
     , AddrMode(..)
+    , Opcode(..)
     , ASM(..)
     , toBitBlocks
     , asInts
@@ -24,7 +25,7 @@ import Data.Bits
 import Data.Maybe
 
 version :: String
-version = "0.9.0"
+version = "0.90.0"
 
 {-
 - https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
@@ -137,47 +138,52 @@ instance Show AddrMode where
 
 data OpFormat = OFA1 | OFA2 | OFI1 | OF0
 
+data Opcode
+  = MOV
+  | ADD
+  | SUB
+  | CMP
+  | BIT
+  | BIC
+  | BIS
+  | INC
+  | DEC
+  | NEG
+  | CLR
+  | ASL
+  | ASR
+  | JMP
+  | BR
+  | BNE
+  | BEQ
+  deriving (Eq, Ord, Read)
+
 data ASM
-  = MOV AddrMode AddrMode
-  | ADD AddrMode AddrMode
-  | SUB AddrMode AddrMode
-  | CMP AddrMode AddrMode
-  | BIT AddrMode AddrMode
-  | BIC AddrMode AddrMode
-  | BIS AddrMode AddrMode
---  | MUL AddrMode AddrMode
-  | INC AddrMode
-  | DEC AddrMode
-  | NEG AddrMode
-  | CLR AddrMode
-  | ASL AddrMode
-  | ASR AddrMode
-  | JMP AddrMode
-  | BR Int
-  | BNE Int
-  | BEQ Int
+  = Inst2 Opcode AddrMode AddrMode
+  | Inst1 Opcode AddrMode
+  | Inst0 Opcode Int
   | NOP
   deriving (Eq, Ord, Read)
 
 opcodeAttr :: ASM -> (String, OpFormat, [Int], [AddrMode])
-opcodeAttr (MOV a1 a2) = ("MOV", OFA2, [0,0,0,1], [a1, a2])
-opcodeAttr (ADD a1 a2) = ("ADD", OFA2, [1,1,1,0], [a1, a2])
-opcodeAttr (SUB a1 a2) = ("SUB", OFA2, [0,1,1,0], [a1, a2])
-opcodeAttr (CMP a1 a2) = ("CMP", OFA2, [0,0,1,0], [a1, a2])
-opcodeAttr (BIT a1 a2) = ("BIT", OFA2, [0,0,1,1], [a1, a2])
-opcodeAttr (BIC a1 a2) = ("BIC", OFA2, [0,1,0,0], [a1, a2])
-opcodeAttr (BIS a1 a2) = ("BIS", OFA2, [0,1,0,1], [a1, a2])
-opcodeAttr (INC a) = ("INC", OFA1, [0,0,0,0, 1,0,1,0, 1,0], [a])
-opcodeAttr (DEC a) = ("DEC", OFA1, [0,0,0,0, 1,0,1,0, 1,1], [a])
-opcodeAttr (NEG a) = ("NEG", OFA1, [0,0,0,0, 1,0,1,1, 0,0], [a])
-opcodeAttr (CLR a) = ("CLR", OFA1, [0,0,0,0, 1,0,1,0, 0,0], [a])
-opcodeAttr (ASL a) = ("ASL", OFA1, [0,0,0,0, 1,1,0,0, 1,0], [a])
-opcodeAttr (ASR a) = ("ASR", OFA1, [0,0,0,0, 1,1,0,0, 1,1], [a])
-opcodeAttr (JMP a) = ("JMP", OFA1, [0,0,0,0 ,0,0,0,0, 0,1], [a])
-opcodeAttr (BR  o) = ("BR",  OFI1, [0,0,0,0, 0,0,0,1], [Immediate o]) -- bad idea wrapping offset
-opcodeAttr (BNE o) = ("BNE", OFI1, [0,0,0,0, 0,0,1,0], [Immediate o])
-opcodeAttr (BEQ o) = ("BEQ", OFI1, [0,0,0,0, 0,0,1,1], [Immediate o])
-opcodeAttr NOP     = ("NOP", OF0 , [], [])
+opcodeAttr (Inst2 MOV a1 a2) = ("MOV", OFA2, [0,0,0,1], [a1, a2])
+opcodeAttr (Inst2 ADD a1 a2) = ("ADD", OFA2, [1,1,1,0], [a1, a2])
+opcodeAttr (Inst2 SUB a1 a2) = ("SUB", OFA2, [0,1,1,0], [a1, a2])
+opcodeAttr (Inst2 CMP a1 a2) = ("CMP", OFA2, [0,0,1,0], [a1, a2])
+opcodeAttr (Inst2 BIT a1 a2) = ("BIT", OFA2, [0,0,1,1], [a1, a2])
+opcodeAttr (Inst2 BIC a1 a2) = ("BIC", OFA2, [0,1,0,0], [a1, a2])
+opcodeAttr (Inst2 BIS a1 a2) = ("BIS", OFA2, [0,1,0,1], [a1, a2])
+opcodeAttr (Inst1 INC a)     = ("INC", OFA1, [0,0,0,0, 1,0,1,0, 1,0], [a])
+opcodeAttr (Inst1 DEC a)     = ("DEC", OFA1, [0,0,0,0, 1,0,1,0, 1,1], [a])
+opcodeAttr (Inst1 NEG a)     = ("NEG", OFA1, [0,0,0,0, 1,0,1,1, 0,0], [a])
+opcodeAttr (Inst1 CLR a)     = ("CLR", OFA1, [0,0,0,0, 1,0,1,0, 0,0], [a])
+opcodeAttr (Inst1 ASL a)     = ("ASL", OFA1, [0,0,0,0, 1,1,0,0, 1,0], [a])
+opcodeAttr (Inst1 ASR a)     = ("ASR", OFA1, [0,0,0,0, 1,1,0,0, 1,1], [a])
+opcodeAttr (Inst1 JMP a)     = ("JMP", OFA1, [0,0,0,0 ,0,0,0,0, 0,1], [a])
+opcodeAttr (Inst0 BR  o)     = ("BR",  OFI1, [0,0,0,0, 0,0,0,1], [Immediate o]) -- bad idea wrapping offset
+opcodeAttr (Inst0 BNE o)     = ("BNE", OFI1, [0,0,0,0, 0,0,1,0], [Immediate o])
+opcodeAttr (Inst0 BEQ o)     = ("BEQ", OFI1, [0,0,0,0, 0,0,1,1], [Immediate o])
+opcodeAttr NOP               = ("NOP", OF0 , [], [])
 
 instance Show ASM where
   show m = case opcodeAttr m of

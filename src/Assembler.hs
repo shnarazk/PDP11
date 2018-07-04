@@ -103,58 +103,58 @@ twoAddrs = do
 ---------------------------------------------------------
 
 asmMOV :: Parsec String () ASM
-asmMOV = uncurry MOV <$> (try (string "MOV ") *> twoAddrs)
+asmMOV = uncurry (Inst2 MOV) <$> (try (string "MOV ") *> twoAddrs)
 
 asmADD :: Parsec String () ASM
-asmADD = uncurry ADD <$> (try (string "ADD ") *> twoAddrs)
+asmADD = uncurry (Inst2 ADD) <$> (try (string "ADD ") *> twoAddrs)
 
 asmSUB :: Parsec String () ASM
-asmSUB = uncurry ADD <$> (try (string "SUB ") *> twoAddrs)
+asmSUB = uncurry (Inst2 ADD) <$> (try (string "SUB ") *> twoAddrs)
 
 asmCMP :: Parsec String () ASM
-asmCMP = uncurry CMP <$> (try (string "CMP ") *> twoAddrs)
+asmCMP = uncurry (Inst2 CMP) <$> (try (string "CMP ") *> twoAddrs)
 
 asmBIT :: Parsec String () ASM
-asmBIT = uncurry BIT <$> (try (string "BIT ") *> twoAddrs)
+asmBIT = uncurry (Inst2 BIT) <$> (try (string "BIT ") *> twoAddrs)
 
 asmBIC :: Parsec String () ASM
-asmBIC = uncurry BIC <$> (try (string "BIC ") *> twoAddrs)
+asmBIC = uncurry (Inst2 BIC) <$> (try (string "BIC ") *> twoAddrs)
 
 asmBIS :: Parsec String () ASM
-asmBIS = uncurry BIS <$> (try (string "BIS ") *> twoAddrs)
+asmBIS = uncurry (Inst2 BIS) <$> (try (string "BIS ") *> twoAddrs)
 
 -- asmMUL :: Parsec String () ASM
 -- asmMUL = uncurry ADD <$> (try (string "MUL ") *> twoAddrs)
 
 asmINC :: Parsec String () ASM
-asmINC = INC <$> (try (string "INC ") *> oneAddr)
+asmINC = Inst1 INC <$> (try (string "INC ") *> oneAddr)
 
 asmDEC :: Parsec String () ASM
-asmDEC = DEC <$> (try (string "DEC ") *> oneAddr)
+asmDEC = Inst1 DEC <$> (try (string "DEC ") *> oneAddr)
 
 asmNEG :: Parsec String () ASM
-asmNEG = NEG <$> (try (string "NEG ") *> oneAddr)
+asmNEG = Inst1 NEG <$> (try (string "NEG ") *> oneAddr)
 
 asmCLR :: Parsec String () ASM
-asmCLR = CLR <$> (try (string "CLR ") *> oneAddr)
+asmCLR = Inst1 CLR <$> (try (string "CLR ") *> oneAddr)
 
 asmASL :: Parsec String () ASM
-asmASL = ASL <$> (try (string "ASL ") *> oneAddr)
+asmASL = Inst1 ASL <$> (try (string "ASL ") *> oneAddr)
 
 asmASR :: Parsec String () ASM
-asmASR = ASR <$> (try (string "ASR ") *> oneAddr)
+asmASR = Inst1 ASR <$> (try (string "ASR ") *> oneAddr)
 
 asmJMP :: Parsec String () ASM
-asmJMP = JMP <$> (try (string "JMP ") *> oneAddr)
+asmJMP = Inst1 JMP <$> (try (string "JMP ") *> oneAddr)
 
 asmBR :: Parsec String () ASM
-asmBR = BR <$> (try (string "BR ") *> pminteger)
+asmBR  = Inst0 BR <$> (try (string "BR ") *> pminteger)
 
 asmBNE :: Parsec String () ASM
-asmBNE = BNE <$> (try (string "BNE ") *> pminteger)
+asmBNE = Inst0 BNE <$> (try (string "BNE ") *> pminteger)
 
 asmBEQ :: Parsec String () ASM
-asmBEQ = BEQ <$> (try (string "BEQ ") *> pminteger)
+asmBEQ = Inst0 BEQ <$> (try (string "BEQ ") *> pminteger)
 
 integer :: Parsec String () Int
 integer = read <$> many1 digit
@@ -164,8 +164,3 @@ ninteger = char '-' *> (negate <$> integer)
 
 pminteger :: Parsec String () Int
 pminteger = choice [ninteger, integer]
-
-line :: Parsec String () ASM
-line = do
-  x <- integer
-  return $ MOV (Register (Reg x)) (Register (Reg x))
