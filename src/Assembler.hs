@@ -9,7 +9,7 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.9.2"
+version = "0.9.3"
 
 assemble :: String -> Either String [ASM]
 assemble str = case parse readASMs "ERROR" str of
@@ -109,7 +109,7 @@ asmADD :: Parsec String () ASM
 asmADD = uncurry (Inst2 ADD) <$> (try (string "ADD ") *> twoAddrs)
 
 asmSUB :: Parsec String () ASM
-asmSUB = uncurry (Inst2 ADD) <$> (try (string "SUB ") *> twoAddrs)
+asmSUB = uncurry (Inst2 SUB) <$> (try (string "SUB ") *> twoAddrs)
 
 asmCMP :: Parsec String () ASM
 asmCMP = uncurry (Inst2 CMP) <$> (try (string "CMP ") *> twoAddrs)
