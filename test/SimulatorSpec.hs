@@ -19,9 +19,13 @@ instances =
 testRun :: (FilePath, [Int], [Int]) -> Spec
 testRun (target, mem, reg) = do
   (Right code) <- assemble <$> runIO (readFile target)
-  let s = makePDP11 mem reg
+  let s = simplify $ makePDP11 mem reg
   describe target $ do
-    it ("ends in " ++ show s) $ setTrace (-1, NOP) (resetPSW (last (runSimulator 32 initialMachine code))) `shouldBe` s
+    it ("ends in " ++ show s) $ simplify (last (runSimulator 32 initialMachine code)) `shouldBe` s
 
 spec :: Spec
 spec = mapM_ testRun instances
+
+simplify :: Machine -> ([Int], [Int])
+simplify p = (take 12 m, r)
+  where (m, r, _, _, _) = dump p

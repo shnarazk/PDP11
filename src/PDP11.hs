@@ -270,22 +270,22 @@ fromBinaryList l = foldr (\a b -> a + 2 * b) 0 $ reverse l
 asBinaryList :: Int -> [Int]
 asBinaryList = reverse . take 16 . map (`mod` 2) . iterate (`div` 2)
 
-decodeWord :: Int -> (Int, Int) -> (Int, ASM)
+decodeWord :: Int -> (Int, Int) -> ASM
 decodeWord x (x1, x2)
   | Just (op, _, t) <- find (\(_, b, _) -> b `isPrefixOf` bits) codeTable =
       case t of
         OFA2 -> let a1 = am 11 6
                     a2 = am 5 0
                 in case (extends a1, extends a2) of
-                     (Just _, Just _)   -> (2, Inst2 op (injectOffset a1 x1) (injectOffset a2 x2))
-                     (Just _, Nothing)  -> (1, Inst2 op (injectOffset a1 x1) a2)
-                     (Nothing, Just _)  -> (1, Inst2 op a1 (injectOffset a2 x2))
-                     (Nothing, Nothing) -> (0, Inst2 op a1 a2)
+                     (Just _, Just _)   -> Inst2 op (injectOffset a1 x1) (injectOffset a2 x2)
+                     (Just _, Nothing)  -> Inst2 op (injectOffset a1 x1) a2
+                     (Nothing, Just _)  -> Inst2 op a1 (injectOffset a2 x2)
+                     (Nothing, Nothing) -> Inst2 op a1 a2
         OFA1 -> let a = am 5 0
                 in case extends a of
-                     Just _  -> (1, Inst1 op (injectOffset a x1))
-                     Nothing -> (0, Inst1 op a)
-        OFI1 -> (0, Inst0 op (fromBinaryList (drop 8 bits)))
+                     Just _  -> Inst1 op (injectOffset a x1)
+                     Nothing -> Inst1 op a
+        OFI1 -> Inst0 op (fromBinaryList (drop 8 bits))
   | otherwise = error $ "invalid code: " ++ show x
   where
     bits = asBinaryList x

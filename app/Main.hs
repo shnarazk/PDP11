@@ -7,17 +7,18 @@ import Simulator
 
 main :: IO ()
 main = do str <- getContents
-          let form l = l' ++ replicate (32 - length l') ' '
-                where l' = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t") $ l
-              printer l (i, b) =
-                putStrLn $
-                     form (if i == 0 then l else "")
-                  ++ show b ++ "         "
-                  ++ if i == 0 then show . snd . decodeWord (asInt b) $ (0, 0) else ""
-              toBit l = case assemble (l ++ "\n") of
-                Right [as] -> mapM_ (printer l) (zip [0 ..] (toBitBlocks as))
-                Left mes -> print mes
-          mapM_ toBit (lines str)
-          case (fromTrace . runSimulator 32 initialMachine) <$> assemble str of
+          let code = assemble str
+          case code of
+            Right as -> mapM_ putStrLn $ showBinaryCode 100 as
+            Left s   -> putStrLn s
+          -- print $ (_memory . head . runSimulator 32 initialMachine) <$> assemble str
+          case (fromTrace . runSimulator 32 initialMachine) <$> code of
             Right result -> putStrLn result
             Left _ -> putStrLn "wrong code"
+
+showBinaryCode :: Int -> [ASM] -> [String]
+showBinaryCode start prg = zipWith merge [start, start + 2 ..] $  concatMap (printer . toBitBlocks) prg
+  where printer (oc:ols) = l1 : map show ols
+          where l1 = show oc ++ "         # " ++ show (decodeWord (asInt oc) (ols' !! 0, ols' !! 1))
+                ols' = map asInt ols ++ [0, 0]
+        merge n s = show n ++ "        " ++ s

@@ -9,7 +9,7 @@ import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.9.1"
+version = "0.9.2"
 
 assemble :: String -> Either String [ASM]
 assemble str = case parse readASMs "ERROR" str of
@@ -86,7 +86,7 @@ addrModeAutoDec = do
 addrModeImmediate :: Parsec String () AddrMode
 addrModeImmediate = do
   char '#'
-  Immediate <$> integer
+  Immediate <$> pminteger
 
 oneAddr :: Parsec String () AddrMode
 oneAddr = do
