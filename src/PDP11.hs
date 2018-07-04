@@ -12,12 +12,15 @@ module PDP11
     , Locator(..)
     , RegId(..)
     , AddrMode(..)
+    , OpFormat(..)
     , Opcode(..)
     , ASM(..)
     , toBitBlocks
     , asInt
     , encode
+    , encodeWord
     , decodeWord
+    , codeTable
     ) where
 
 import Data.Array
@@ -304,5 +307,10 @@ decodeAddrMode l = case take 3 l of
   where
     i = fromBinaryList (drop 3 l)
 
+-- | returns [8bit Int]
+-- if you want [16bit Int], then use `encodeWord`
 encode :: [ASM] -> [Int]
 encode = concatMap asInts . concatMap toBitBlocks
+
+encodeWord :: [ASM] -> [Int]
+encodeWord = map asInt . concatMap toBitBlocks
