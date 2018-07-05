@@ -89,7 +89,7 @@ data AddrMode
   | AutoInc RegId               -- 010 Autoincrement
   | AutoDec RegId               -- 100 Autodecrement
   | Index Int RegId             -- 110 Index
-  | Indirect AddrMode           -- **1 ... Deffered
+  | Indirect AddrMode           -- --1 ... Deffered
   | Immediate Int               -- 011(R7) Immediate
   deriving (Eq, Ord, Read)
 
