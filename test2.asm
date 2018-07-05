@@ -1,0 +1,4 @@
+	MOV #106, R0
+	MOV #0, R1
+	INC @R0
+	JMP #104
