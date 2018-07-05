@@ -1,5 +1,40 @@
 # PDP11
 
+- https://programmer209.wordpress.com/2011/08/03/the-pdp-11-assembly-language/
+
+```
+If N is an address in memory then (N) is the data stored at the address N.
+Syntax       Mode                          Action
+Rn           Register                      Data = Rn
+(Rn)+        Autoincrement                 Data = (Rn)
+                                           Rn++
+-(Rn)        Autodecrement                 Rn–
+                                           Data = (Rn)
+X(Rn)        Index                         Offset address X = (PC)
+                                           PC += 2
+                                           Base address = Rn
+                                           Data = (Rn + X)
+@Rn or (Rn)  Register Deferred             Data = (Rn)
+@(Rn)+       Autoincrement Deferred        Data =((Rn))
+                                           Rn++
+@-(Rn)       Autodecrement Deferred        Rn–
+                                           Data =((Rn))
+@X(Rn)       Index Deferred                Offset address X = (PC)
+                                           PC += 2
+                                           Base address = Rn
+                                           Data = ((Rn + X))
+#n           Immediate                     Data = (PC) = n
+@#A          Immediate Deferred (Absolute) Data = ((PC)) = (A)
+A or X(PC)   Relative                      Offset address X = (PC)
+                                           PC += 2
+                                           Data = (PC + X) = (A)
+@A or @X(PC) Relative Deferred             Offset address X = (PC)
+                                           PC += 2
+                                           Data = ((PC + X)) = ((A))
+```
+
+### examples
+
 ```
 $ PDP11-exe  < Q7-14.asm
 #0 Initial state
