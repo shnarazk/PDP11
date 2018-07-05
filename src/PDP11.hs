@@ -17,6 +17,7 @@ module PDP11
     , ASM(..)
     , toBitBlocks
     , asInt
+    , asBinaryList
     , encode
     , encodeWord
     , decodeWord
