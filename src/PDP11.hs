@@ -3,6 +3,8 @@ module PDP11
       version
     , makePDP11
     , initialMachine
+    -- * stats
+    , countOpcodes
     -- * Plumbing
     , MemBlock
     , PSW()
@@ -30,7 +32,7 @@ import Data.List
 import Data.Maybe
 
 version :: String
-version = "0.90.0"
+version = "0.91.0"
 
 type MemBlock = Array Int Int
 
@@ -315,3 +317,6 @@ encode = concatMap asInts . concatMap toBitBlocks
 
 encodeWord :: [ASM] -> [Int]
 encodeWord = map asInt . concatMap toBitBlocks
+
+countOpcodes :: [ASM] -> Int
+countOpcodes prg = length . nub . map ((\(n, _, _, _) -> n) . opcodeAttr) $ prg
