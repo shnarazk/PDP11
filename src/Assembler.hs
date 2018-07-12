@@ -1,15 +1,17 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Assembler
     (
       version
     , assemble
     ) where
 
+import Language.Haskell.TH
 import Text.Parsec
 import Text.Parsec.Char
 import PDP11 hiding (version)
 
 version :: String
-version = "0.9.3"
+version = "0.9.3+"
 
 assemble :: String -> Either String [ASM]
 assemble str = case parse readASMs "ERROR" str of
