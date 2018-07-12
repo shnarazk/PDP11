@@ -1,8 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module AssemblerBase
     (
-      version
-    , mkParsers
+      mkParsers
     , parserNames
     ) where
 
@@ -13,9 +12,6 @@ import Language.Haskell.TH.Syntax
 import Text.Parsec
 import Text.Parsec.Char
 import PDP11 hiding (version)
-
-version :: String
-version = "0.9.3+"
 
 registerId :: Parsec String () RegId
 registerId = do

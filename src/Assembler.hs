@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Assembler
     (
-      module AssemblerBase
+      version
     , assemble
     ) where
 
@@ -10,7 +10,7 @@ import PDP11 hiding (version)
 import AssemblerBase
 
 version :: String
-version = "0.9.3+"
+version = "0.10.0"
 
 $(mkParsers codeTable)
 
