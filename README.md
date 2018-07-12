@@ -65,3 +65,4 @@ CLR @(R1)+                      0000_1010_0001_1001
 - [x] Discord-hs -- make a bot
 - [x] Servant -- run as a web server
 - [X] Bits -- Everything should be a bit stream
+- [X] TemplateHaskell -- ditch stupid iterations
