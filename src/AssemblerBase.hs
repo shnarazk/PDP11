@@ -77,63 +77,6 @@ twoAddrs = do
   y <- spaces *> addrMode
   return $ (x, y)
 
----------------------------------------------------------
-{-
--- asmMOV :: Parsec String () ASM
--- asmMOV = uncurry (Inst2 MOV) <$> (try (string "MOV ") *> twoAddrs)
-
-asmADD :: Parsec String () ASM
-asmADD = uncurry (Inst2 ADD) <$> (try (string "ADD ") *> twoAddrs)
-
-asmSUB :: Parsec String () ASM
-asmSUB = uncurry (Inst2 SUB) <$> (try (string "SUB ") *> twoAddrs)
-
-asmCMP :: Parsec String () ASM
-asmCMP = uncurry (Inst2 CMP) <$> (try (string "CMP ") *> twoAddrs)
-
-asmBIT :: Parsec String () ASM
-asmBIT = uncurry (Inst2 BIT) <$> (try (string "BIT ") *> twoAddrs)
-
-asmBIC :: Parsec String () ASM
-asmBIC = uncurry (Inst2 BIC) <$> (try (string "BIC ") *> twoAddrs)
-
-asmBIS :: Parsec String () ASM
-asmBIS = uncurry (Inst2 BIS) <$> (try (string "BIS ") *> twoAddrs)
-
--- asmMUL :: Parsec String () ASM
--- asmMUL = uncurry ADD <$> (try (string "MUL ") *> twoAddrs)
-
-asmINC :: Parsec String () ASM
-asmINC = Inst1 INC <$> (try (string "INC ") *> oneAddr)
-
-asmDEC :: Parsec String () ASM
-asmDEC = Inst1 DEC <$> (try (string "DEC ") *> oneAddr)
-
-asmNEG :: Parsec String () ASM
-asmNEG = Inst1 NEG <$> (try (string "NEG ") *> oneAddr)
-
-asmCLR :: Parsec String () ASM
-asmCLR = Inst1 CLR <$> (try (string "CLR ") *> oneAddr)
-
-asmASL :: Parsec String () ASM
-asmASL = Inst1 ASL <$> (try (string "ASL ") *> oneAddr)
-
-asmASR :: Parsec String () ASM
-asmASR = Inst1 ASR <$> (try (string "ASR ") *> oneAddr)
-
-asmJMP :: Parsec String () ASM
-asmJMP = Inst1 JMP <$> (try (string "JMP ") *> oneAddr)
-
-asmBR :: Parsec String () ASM
-asmBR  = Inst0 BR <$> (try (string "BR ") *> pminteger)
-
-asmBNE :: Parsec String () ASM
-asmBNE = Inst0 BNE <$> (try (string "BNE ") *> pminteger)
-
-asmBEQ :: Parsec String () ASM
-asmBEQ = Inst0 BEQ <$> (try (string "BEQ ") *> pminteger)
--}
-
 integer :: Parsec String () Int
 integer = read <$> many1 digit
 
